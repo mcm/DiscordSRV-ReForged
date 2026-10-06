@@ -21,15 +21,25 @@
 package github.scarsz.discordsrv.util;
 
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.hooks.permissions.LuckPermsHook;
 import github.scarsz.discordsrv.objects.Lag;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import github.scarsz.discordsrv.platform.Platform;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Placeholder replacement. The Spigot version delegated to PlaceholderAPI, which doesn't exist on NeoForge;
+ * instead a small set of built-in placeholders (named like their PlaceholderAPI counterparts) is supported:
+ * <ul>
+ *     <li>{@code %player_name%}, {@code %player_displayname%}, {@code %player_uuid%}, {@code %player_world%},
+ *     {@code %player_ping%}, {@code %luckperms_primary_group_name%} (when a player is available)</li>
+ *     <li>{@code %server_online%}, {@code %server_max_players%}, {@code %server_tps%}, {@code %server_version%},
+ *     {@code %server_motd%}, {@code %server_unique_joins%}</li>
+ * </ul>
+ */
 public class PlaceholderUtil {
 
     private PlaceholderUtil() {}
@@ -38,12 +48,32 @@ public class PlaceholderUtil {
         return replacePlaceholders(input, null);
     }
 
-    public static String replacePlaceholders(String input, OfflinePlayer player) {
+    public static String replacePlaceholders(String input, GamePlayer player) {
         if (input == null) return null;
-        if (PluginUtil.pluginHookIsEnabled("placeholderapi")) {
-            Player onlinePlayer = player != null ? player.getPlayer() : null;
-            input = me.clip.placeholderapi.PlaceholderAPI.setPlaceholders(
-                    onlinePlayer != null ? onlinePlayer : player, input);
+        if (input.indexOf('%') == -1) return input;
+
+        Platform platform = DiscordSRV.getPlatform();
+        if (player != null) {
+            if (input.contains("%player_")) {
+                input = input
+                        .replace("%player_name%", player.getName())
+                        .replace("%player_displayname%", MessageUtil.strip(player.getDisplayName()))
+                        .replace("%player_uuid%", player.getUniqueId().toString())
+                        .replace("%player_world%", player.getWorldName())
+                        .replace("%player_ping%", String.valueOf(player.getPing()));
+            }
+            if (input.contains("%luckperms_primary_group_name%")) {
+                input = input.replace("%luckperms_primary_group_name%", notNull(LuckPermsHook.getPrimaryGroup(player.getUniqueId())));
+            }
+        }
+        if (input.contains("%server_")) {
+            input = input
+                    .replace("%server_online%", String.valueOf(PlayerUtil.getOnlinePlayers(true).size()))
+                    .replace("%server_max_players%", String.valueOf(platform.getMaxPlayers()))
+                    .replace("%server_tps%", Lag.getTPSString())
+                    .replace("%server_version%", notNull(platform.getServerVersion()))
+                    .replace("%server_motd%", MessageUtil.strip(notNull(platform.getMotd())))
+                    .replace("%server_unique_joins%", String.valueOf(platform.getTotalPlayerCount()));
         }
         return input;
     }
@@ -58,21 +88,8 @@ public class PlaceholderUtil {
     /**
      * Important when the content may contain role mentions
      */
-    public static String replacePlaceholdersToDiscord(String input, OfflinePlayer player) {
-        boolean placeholderapi = PluginUtil.pluginHookIsEnabled("placeholderapi");
-
-        // PlaceholderAPI has a side effect of replacing chat colors at the end of placeholder conversion
-        // that breaks role mentions: <@&role id> because it converts the & to a §
-        // So we add a zero width space after the & to prevent it from translating, and remove it after conversion
-        if (placeholderapi) input = input.replace("&", "&\u200B");
-
-        input = replacePlaceholders(input, player);
-
-        if (placeholderapi) {
-            input = MessageUtil.stripLegacy(input); // PAPI no longer replaces chat colors? strip both legacy codes
-            input = input.replace("&\u200B", "&");
-        }
-        return input;
+    public static String replacePlaceholdersToDiscord(String input, GamePlayer player) {
+        return replacePlaceholders(input, player);
     }
 
     /*
@@ -82,22 +99,22 @@ public class PlaceholderUtil {
     public static String replaceChannelUpdaterPlaceholders(String input) {
         if (StringUtils.isBlank(input)) return "";
 
-        // set PAPI placeholders
         input = PlaceholderUtil.replacePlaceholdersToDiscord(input);
 
         final Map<String, String> mem = MemUtil.get();
+        Platform platform = DiscordSRV.getPlatform();
 
         input = input.replaceAll("%time%|%date%", notNull(TimeUtil.timeStamp()))
                 .replace("%playercount%", notNull(Integer.toString(PlayerUtil.getOnlinePlayers(true).size())))
-                .replace("%playermax%", notNull(Integer.toString(Bukkit.getMaxPlayers())))
+                .replace("%playermax%", notNull(Integer.toString(platform.getMaxPlayers())))
                 .replace("%totalplayers%", notNull(Integer.toString(DiscordSRV.getTotalPlayerCount())))
                 .replace("%uptimemins%", notNull(Long.toString(TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - DiscordSRV.getPlugin().getStartTime()))))
                 .replace("%uptimehours%", notNull(Long.toString(TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis() - DiscordSRV.getPlugin().getStartTime()))))
                 .replace("%uptimedays%", notNull(Long.toString(TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - DiscordSRV.getPlugin().getStartTime()))))
                 .replace("%timestamp%", notNull(Long.toString(System.currentTimeMillis() / 1000)))
                 .replace("%starttimestamp%", notNull(Long.toString(TimeUnit.MILLISECONDS.toSeconds(DiscordSRV.getPlugin().getStartTime()))))
-                .replace("%motd%", notNull(StringUtils.isNotBlank(Bukkit.getMotd()) ? MessageUtil.strip(Bukkit.getMotd()) : ""))
-                .replace("%serverversion%", notNull(Bukkit.getBukkitVersion()))
+                .replace("%motd%", notNull(StringUtils.isNotBlank(platform.getMotd()) ? MessageUtil.strip(platform.getMotd()) : ""))
+                .replace("%serverversion%", notNull(platform.getServerVersion()))
                 .replace("%freememory%", notNull(mem.get("freeMB")))
                 .replace("%usedmemory%", notNull(mem.get("usedMB")))
                 .replace("%totalmemory%", notNull(mem.get("totalMB")))

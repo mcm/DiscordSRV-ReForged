@@ -24,8 +24,7 @@ import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.util.GamePermissionUtil;
 import github.scarsz.discordsrv.util.LangUtil;
 import github.scarsz.discordsrv.util.MessageUtil;
-import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
+import github.scarsz.discordsrv.platform.CommandSender;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -33,19 +32,28 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class CommandHelp {
 
-    private static List<ChatColor> disallowedChatColorCharacters = new ArrayList<ChatColor>() {{
-        add(ChatColor.BLACK);
-        add(ChatColor.DARK_BLUE);
-        add(ChatColor.GRAY);
-        add(ChatColor.DARK_GRAY);
-        add(ChatColor.WHITE);
-        add(ChatColor.MAGIC);
-        add(ChatColor.BOLD);
-        add(ChatColor.STRIKETHROUGH);
-        add(ChatColor.UNDERLINE);
-        add(ChatColor.ITALIC);
-        add(ChatColor.RESET);
+    // legacy color & formatting codes, in the same order as Bukkit's ChatColor values
+    private static final String CHAT_COLORS = "0123456789abcdefklmnor";
+    private static final char RESET = 'r';
+    private static final String DARK_GRAY = "§8", GRAY = "§7", ITALIC = "§o";
+
+    private static List<Character> disallowedChatColorCharacters = new ArrayList<Character>() {{
+        add('0'); // black
+        add('1'); // dark blue
+        add('7'); // gray
+        add('8'); // dark gray
+        add('f'); // white
+        add('k'); // magic
+        add('l'); // bold
+        add('m'); // strikethrough
+        add('n'); // underline
+        add('o'); // italic
+        add(RESET);
     }};
+
+    private static String color(char code) {
+        return "§" + code;
+    }
 
     @Command(commandNames = { "?", "help" },
             helpMessage = "Shows command help for DiscordSRV's commands",
@@ -61,26 +69,26 @@ public class CommandHelp {
     }
 
     private static void help(CommandSender sender) {
-        ChatColor titleColor = ChatColor.RESET, commandColor = ChatColor.RESET;
+        char titleColor = RESET, commandColor = RESET;
         while (disallowedChatColorCharacters.contains(titleColor))
-            titleColor = ChatColor.values()[ThreadLocalRandom.current().nextInt(ChatColor.values().length)];
+            titleColor = CHAT_COLORS.charAt(ThreadLocalRandom.current().nextInt(CHAT_COLORS.length()));
         while (disallowedChatColorCharacters.contains(commandColor) || commandColor == titleColor)
-            commandColor = ChatColor.values()[ThreadLocalRandom.current().nextInt(ChatColor.values().length)];
+            commandColor = CHAT_COLORS.charAt(ThreadLocalRandom.current().nextInt(CHAT_COLORS.length()));
 
         List<Method> commandMethods = new ArrayList<>();
         for (Method method : DiscordSRV.getPlugin().getCommandManager().getCommands().values())
             if (!commandMethods.contains(method)) commandMethods.add(method);
 
-        MessageUtil.sendMessage(sender, ChatColor.DARK_GRAY + "================[ " + titleColor + "DiscordSRV" + ChatColor.DARK_GRAY + " ]================");
+        MessageUtil.sendMessage(sender, DARK_GRAY + "================[ " + color(titleColor) + "DiscordSRV" + DARK_GRAY + " ]================");
         for (Method commandMethod : commandMethods) {
             Command commandAnnotation = commandMethod.getAnnotation(Command.class);
 
             // make sure sender has permission to run the commands before showing them permissions for it
             if (!GamePermissionUtil.hasPermission(sender, commandAnnotation.permission())) continue;
 
-            MessageUtil.sendMessage(sender, ChatColor.GRAY + "- " + commandColor + "/discord " + String.join("/", commandAnnotation.commandNames()));
-            MessageUtil.sendMessage(sender, "    " + ChatColor.ITALIC + commandAnnotation.helpMessage());
-            if (!commandAnnotation.usageExample().equals("")) MessageUtil.sendMessage(sender, "    " + ChatColor.GRAY + ChatColor.ITALIC + "ex. /discord " + commandAnnotation.usageExample());
+            MessageUtil.sendMessage(sender, GRAY + "- " + color(commandColor) + "/discord " + String.join("/", commandAnnotation.commandNames()));
+            MessageUtil.sendMessage(sender, "    " + ITALIC + commandAnnotation.helpMessage());
+            if (!commandAnnotation.usageExample().equals("")) MessageUtil.sendMessage(sender, "    " + GRAY + ITALIC + "ex. /discord " + commandAnnotation.usageExample());
         }
     }
 
@@ -90,11 +98,11 @@ public class CommandHelp {
      * @param commands
      */
     private static void help(CommandSender sender, List<String> commands) {
-        ChatColor titleColor = ChatColor.RESET, commandColor = ChatColor.RESET;
+        char titleColor = RESET, commandColor = RESET;
         while (disallowedChatColorCharacters.contains(titleColor))
-            titleColor = ChatColor.values()[ThreadLocalRandom.current().nextInt(ChatColor.values().length - 1)];
+            titleColor = CHAT_COLORS.charAt(ThreadLocalRandom.current().nextInt(CHAT_COLORS.length() - 1));
         while (disallowedChatColorCharacters.contains(commandColor) || commandColor == titleColor)
-            commandColor = ChatColor.values()[ThreadLocalRandom.current().nextInt(ChatColor.values().length - 1)];
+            commandColor = CHAT_COLORS.charAt(ThreadLocalRandom.current().nextInt(CHAT_COLORS.length() - 1));
 
         List<Method> commandMethodsList = new LinkedList<>();
         Map<String, Method> commandMethods = DiscordSRV.getPlugin().getCommandManager().getCommands();
@@ -109,16 +117,16 @@ public class CommandHelp {
             return;
         }
 
-        MessageUtil.sendMessage(sender, ChatColor.DARK_GRAY + "===================[ " + titleColor + "DiscordSRV" + ChatColor.DARK_GRAY + " ]===================");
+        MessageUtil.sendMessage(sender, DARK_GRAY + "===================[ " + color(titleColor) + "DiscordSRV" + DARK_GRAY + " ]===================");
         for (Method commandMethod : commandMethodsList) {
             Command commandAnnotation = commandMethod.getAnnotation(Command.class);
 
             // make sure sender has permission to run the commands before showing them permissions for it
             if (!GamePermissionUtil.hasPermission(sender, commandAnnotation.permission())) continue;
 
-            MessageUtil.sendMessage(sender, ChatColor.GRAY + "- " + commandColor + "/discord " + String.join("/", commandAnnotation.commandNames()));
-            MessageUtil.sendMessage(sender, "   " + ChatColor.ITALIC + commandAnnotation.helpMessage());
-            if (!commandAnnotation.usageExample().equals("")) MessageUtil.sendMessage(sender, "   " + ChatColor.GRAY + ChatColor.ITALIC + "ex. /discord " + commandAnnotation.usageExample());
+            MessageUtil.sendMessage(sender, GRAY + "- " + color(commandColor) + "/discord " + String.join("/", commandAnnotation.commandNames()));
+            MessageUtil.sendMessage(sender, "   " + ITALIC + commandAnnotation.helpMessage());
+            if (!commandAnnotation.usageExample().equals("")) MessageUtil.sendMessage(sender, "   " + GRAY + ITALIC + "ex. /discord " + commandAnnotation.usageExample());
         }
     }
 

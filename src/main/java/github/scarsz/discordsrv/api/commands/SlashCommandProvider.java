@@ -21,17 +21,15 @@
 package github.scarsz.discordsrv.api.commands;
 
 import github.scarsz.discordsrv.api.ApiManager;
-import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.commands.CommandInteraction;
-import org.bukkit.plugin.Plugin;
 
 import java.util.Set;
 
 /**
  * Provides sets of {@link PluginSlashCommand} to DiscordSRV's {@link ApiManager}.
- * To handle commands, create a {@link SlashCommand}-annotated method in the {@link SlashCommandProvider} with one parameter of type {@link SlashCommandEvent}.
- * {@link Plugin}s implementing this interface are automatically registered.
+ * To handle commands, create a {@link SlashCommand}-annotated method in the {@link SlashCommandProvider} with one parameter of type {@link SlashCommandInteractionEvent}.
  * To manually register a provider, use {@link ApiManager#addSlashCommandProvider(SlashCommandProvider)}.
  * @see SlashCommand
  * @see ApiManager#addSlashCommandProvider(SlashCommandProvider)

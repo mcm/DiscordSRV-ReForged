@@ -22,33 +22,30 @@ package github.scarsz.discordsrv.listeners;
 
 import github.scarsz.discordsrv.Debug;
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.platform.Platform;
 import github.scarsz.discordsrv.util.LangUtil;
-import github.scarsz.discordsrv.util.SchedulerUtil;
 import net.dv8tion.jda.api.events.guild.GuildBanEvent;
 import net.dv8tion.jda.api.events.guild.GuildUnbanEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.BanList;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.Date;
 import java.util.UUID;
 
 public class DiscordBanListener extends ListenerAdapter {
 
-    @SuppressWarnings("deprecation") // something something paper component
     @Override
-    public void onGuildBan(GuildBanEvent event) {
+    public void onGuildBan(@NotNull GuildBanEvent event) {
+        if (DiscordSRV.getPlugin().getAccountLinkManager() == null) return;
         UUID linkedUuid = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(event.getUser().getId());
         if (linkedUuid == null) {
             DiscordSRV.debug(Debug.BAN_SYNCHRONIZATION, "Not handling ban for user " + event.getUser() + " because they didn't have a linked account");
             return;
         }
 
-        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(linkedUuid);
-        if (!offlinePlayer.hasPlayedBefore()) return;
+        Platform platform = DiscordSRV.getPlatform();
+        String playerName = platform.getPlayerName(linkedUuid);
+        if (playerName == null) return; // player hasn't played before
 
         if (!DiscordSRV.config().getBoolean("BanSynchronizationDiscordToMinecraft")) {
             DiscordSRV.debug(Debug.BAN_SYNCHRONIZATION, "Not handling ban for user " + event.getUser() + " because doing so is disabled in the config");
@@ -56,36 +53,30 @@ public class DiscordBanListener extends ListenerAdapter {
         }
 
         String reason = LangUtil.Message.BAN_DISCORD_TO_MINECRAFT.toString();
-        BanList banList = Bukkit.getBanList(BanList.Type.NAME);
-        if (banList.isBanned(offlinePlayer.getName())) return; // if they are already banned we don't want to overwrite the original ban reason
-        banList.addBan(offlinePlayer.getName(), reason, (Date) null, "Discord");
-        if (offlinePlayer.isOnline()) {
-            // also kick them because adding them to the BanList isn't enough
-            Player player = offlinePlayer.getPlayer();
-            if (player != null) SchedulerUtil.runTaskForPlayer(DiscordSRV.getPlugin(), player, () -> player.kickPlayer(reason));
-        }
+        if (platform.isBanned(linkedUuid)) return; // if they are already banned we don't want to overwrite the original ban reason
+        // also kicks them if they're online, because adding them to the ban list isn't enough
+        platform.ban(linkedUuid, playerName, reason, "Discord");
     }
 
     @Override
-    public void onGuildUnban(GuildUnbanEvent event) {
+    public void onGuildUnban(@NotNull GuildUnbanEvent event) {
+        if (DiscordSRV.getPlugin().getAccountLinkManager() == null) return;
         UUID linkedUuid = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(event.getUser().getId());
         if (linkedUuid == null) {
             DiscordSRV.debug(Debug.BAN_SYNCHRONIZATION, "Not handling unban for user " + event.getUser() + " because they didn't have a linked account");
             return;
         }
 
-        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(linkedUuid);
-        if (!offlinePlayer.hasPlayedBefore()) return;
+        String playerName = DiscordSRV.getPlatform().getPlayerName(linkedUuid);
+        if (playerName == null) return; // player hasn't played before
 
         if (!DiscordSRV.config().getBoolean("BanSynchronizationDiscordToMinecraft")) {
             DiscordSRV.debug(Debug.BAN_SYNCHRONIZATION, "Not handling unban for user " + event.getUser() + " because doing so is disabled in the config");
             return;
         }
 
-        String playerName = offlinePlayer.getName();
-
-        if (StringUtils.isNotBlank(playerName)) //this literally should not happen but intellij likes bitching about not null checking
-            Bukkit.getBanList(BanList.Type.NAME).pardon(playerName);
+        if (StringUtils.isNotBlank(playerName))
+            DiscordSRV.getPlatform().unban(linkedUuid);
     }
 
 }

@@ -20,7 +20,7 @@
 
 package github.scarsz.discordsrv.api.events;
 
-import org.bukkit.event.Cancellable;
+import github.scarsz.discordsrv.api.Cancellable;
 
 /**
  * <p>Called after DiscordSRV has processed a watchdog message but before being sent to Discord.

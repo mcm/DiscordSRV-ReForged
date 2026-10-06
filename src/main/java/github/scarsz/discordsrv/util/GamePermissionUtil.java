@@ -20,13 +20,12 @@
 
 package github.scarsz.discordsrv.util;
 
-import org.bukkit.command.ConsoleCommandSender;
-import org.bukkit.permissions.Permissible;
+import github.scarsz.discordsrv.platform.CommandSender;
 
 public class GamePermissionUtil {
 
-    public static boolean hasPermission(Permissible sender, String permission) {
-        return sender instanceof ConsoleCommandSender || sender.hasPermission(permission);
+    public static boolean hasPermission(CommandSender sender, String permission) {
+        return sender.isConsole() || sender.hasPermission(permission);
     }
 
 }

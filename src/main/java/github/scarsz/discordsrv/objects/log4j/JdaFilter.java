@@ -25,16 +25,22 @@ import github.scarsz.discordsrv.DiscordSRV;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.Marker;
-import org.apache.logging.log4j.core.Filter;
+import org.apache.logging.log4j.core.filter.AbstractFilter;
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.message.Message;
 
-public class JdaFilter implements Filter {
+public class JdaFilter extends AbstractFilter {
+
+    public JdaFilter() {
+        super(Result.NEUTRAL, Result.NEUTRAL);
+        start();
+    }
 
     public Result check(String loggerName, Level level, String message, Throwable throwable) {
         // only listen for JDA logs
-        if (!loggerName.startsWith("github.scarsz.discordsrv.dependencies.jda")) return Result.NEUTRAL;
+        // (JDA is relocated in the production jar but not in development environments)
+        if (loggerName == null || !(loggerName.startsWith("github.scarsz.discordsrv.dependencies.jda") || loggerName.startsWith("net.dv8tion.jda"))) return Result.NEUTRAL;
 
         switch (level.name()) {
             case "INFO": DiscordSRV.info("[JDA] " + message); break;
@@ -104,24 +110,6 @@ public class JdaFilter implements Filter {
                 level,
                 message.getFormattedMessage(),
                 throwable);
-    }
-
-    public void start() {}
-    public void stop() {}
-    public boolean isStarted() {
-        return true;
-    }
-    public boolean isStopped() {
-        return false;
-    }
-
-    @Override
-    public Result getOnMismatch() {
-        return Result.NEUTRAL;
-    }
-    @Override
-    public Result getOnMatch() {
-        return Result.NEUTRAL;
     }
 
 }

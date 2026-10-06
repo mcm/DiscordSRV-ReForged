@@ -26,23 +26,26 @@ import github.scarsz.discordsrv.api.events.DiscordConsoleCommandPostProcessEvent
 import github.scarsz.discordsrv.api.events.DiscordConsoleCommandPreProcessEvent;
 import github.scarsz.discordsrv.util.DiscordUtil;
 import github.scarsz.discordsrv.util.LangUtil;
-import github.scarsz.discordsrv.util.SchedulerUtil;
 import github.scarsz.discordsrv.util.TimeUtil;
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import org.apache.commons.io.FileUtils;
-import org.bukkit.Bukkit;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public class DiscordConsoleListener extends ListenerAdapter {
 
     @Override
-    public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+    public void onMessageReceived(@NotNull MessageReceivedEvent event) {
+        // only guild messages are relevant
+        if (!event.isFromGuild()) return;
         // check if the server hasn't started yet but someone still tried to run a command...
         if (DiscordUtil.getJda() == null) return;
         // if message is from null author or self do not process
@@ -69,11 +72,8 @@ public class DiscordConsoleListener extends ListenerAdapter {
         File logFile = DiscordSRV.getPlugin().getLogFile();
         if (logFile != null) {
             try {
-                FileUtils.writeStringToFile(
-                        logFile,
-                        "[" + TimeUtil.timeStamp() + " | ID " + event.getAuthor().getId() + "] " + event.getAuthor().getName() + ": " + event.getMessage().getContentRaw() + System.lineSeparator(),
-                        StandardCharsets.UTF_8,
-                        true
+                writeToLogFile(logFile,
+                        "[" + TimeUtil.timeStamp() + " | ID " + event.getAuthor().getId() + "] " + event.getAuthor().getName() + ": " + event.getMessage().getContentRaw() + System.lineSeparator()
                 );
             } catch (IOException e) {
                 DiscordSRV.error(LangUtil.InternalMessage.ERROR_LOGGING_CONSOLE_ACTION + " " + logFile.getAbsolutePath() + ": " + e.getMessage());
@@ -86,11 +86,21 @@ public class DiscordConsoleListener extends ListenerAdapter {
         // stop the command from being run if an API user cancels the event
         if (consoleEvent.isCancelled()) return;
 
-        DiscordSRV.getPlugin().getConsoleAppender().dumpStack();
-        SchedulerUtil.runTask(DiscordSRV.getPlugin(), () ->
-                Bukkit.getServer().dispatchCommand(Bukkit.getServer().getConsoleSender(), consoleEvent.getCommand()));
+        if (DiscordSRV.getPlugin().getConsoleAppender() != null) DiscordSRV.getPlugin().getConsoleAppender().dumpStack();
+        // the command's output is logged to the console (and thus forwarded to the console channel)
+        DiscordSRV.getPlatform().executeConsoleCommand(consoleEvent.getCommand(), feedback -> {});
 
         DiscordSRV.api.callEvent(new DiscordConsoleCommandPostProcessEvent(event, consoleEvent.getCommand(), true));
+    }
+
+    /**
+     * Appends the given text to the given (console channel usage) log file, creating it if needed
+     */
+    public static void writeToLogFile(File logFile, String text) throws IOException {
+        Path path = logFile.toPath();
+        Path parent = path.toAbsolutePath().getParent();
+        if (parent != null) Files.createDirectories(parent);
+        Files.writeString(path, text, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND, StandardOpenOption.WRITE);
     }
 
 }

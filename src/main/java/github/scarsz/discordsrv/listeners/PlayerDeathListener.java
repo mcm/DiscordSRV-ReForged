@@ -25,40 +25,31 @@ import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.api.events.DeathMessagePostProcessEvent;
 import github.scarsz.discordsrv.api.events.DeathMessagePreProcessEvent;
 import github.scarsz.discordsrv.objects.MessageFormat;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import github.scarsz.discordsrv.platform.event.GameListener;
+import github.scarsz.discordsrv.platform.event.PlayerDeathEvent;
 import github.scarsz.discordsrv.util.*;
-import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.TextChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.utils.messages.MessageCreateData;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
 
 import java.util.function.BiFunction;
 
-public class PlayerDeathListener implements Listener {
+public class PlayerDeathListener implements GameListener {
 
-    public PlayerDeathListener() {
-        Bukkit.getPluginManager().registerEvents(this, DiscordSRV.getPlugin());
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @Override
     public void onPlayerDeath(PlayerDeathEvent event) {
-        if (event.getEntityType() != EntityType.PLAYER) return;
-
-        Player player = event.getEntity();
+        GamePlayer player = event.getPlayer();
+        if (player == null) return;
 
         // respect invisibility plugins
         if (PlayerUtil.isVanished(player)) return;
 
-        String message = event.getDeathMessage();
-        SchedulerUtil.runTaskAsynchronously(DiscordSRV.getPlugin(), () -> runAsync(event, player, message));
+        String message = event.getDeathMessage() != null ? MessageUtil.toLegacy(event.getDeathMessage()) : null;
+        SchedulerUtil.runTaskAsynchronously(() -> runAsync(event, player, message));
     }
 
-    private void runAsync(PlayerDeathEvent event, Player player, String deathMessage) {
+    private void runAsync(PlayerDeathEvent event, GamePlayer player, String deathMessage) {
         if (StringUtils.isBlank(deathMessage)) {
             DiscordSRV.debug("Not sending death message for " + player.getName() + ", the death message is null");
             return;
@@ -82,7 +73,7 @@ public class PlayerDeathListener implements Listener {
         if (messageFormat == null) return;
 
         String finalDeathMessage = StringUtils.isNotBlank(deathMessage) ? deathMessage : "";
-        String avatarUrl = DiscordSRV.getAvatarUrl(event.getEntity());
+        String avatarUrl = DiscordSRV.getAvatarUrl(player);
         String botAvatarUrl = DiscordUtil.getJda().getSelfUser().getEffectiveAvatarUrl();
         String botName = DiscordSRV.getPlugin().getMainGuild() != null ? DiscordSRV.getPlugin().getMainGuild().getSelfMember().getEffectiveName() : DiscordUtil.getJda().getSelfUser().getName();
         String displayName = StringUtils.isNotBlank(player.getDisplayName()) ? MessageUtil.strip(player.getDisplayName()) : "";
@@ -96,7 +87,7 @@ public class PlayerDeathListener implements Listener {
                     .replace("%displayname%", needsEscape ? DiscordUtil.escapeMarkdown(displayName) : displayName)
                     .replace("%usernamenoescapes%", player.getName())
                     .replace("%displaynamenoescapes%", displayName)
-                    .replace("%world%", player.getWorld().getName())
+                    .replace("%world%", player.getWorldName())
                     .replace("%deathmessage%", MessageUtil.strip(needsEscape ? DiscordUtil.escapeMarkdown(finalDeathMessage) : finalDeathMessage))
                     .replace("%deathmessagenoescapes%", MessageUtil.strip(finalDeathMessage))
                     .replace("%embedavatarurl%", avatarUrl)
@@ -106,7 +97,7 @@ public class PlayerDeathListener implements Listener {
             content = PlaceholderUtil.replacePlaceholdersToDiscord(content, player);
             return content;
         };
-        Message discordMessage = DiscordSRV.translateMessage(messageFormat, translator);
+        MessageCreateData discordMessage = DiscordSRV.translateMessage(messageFormat, translator);
         if (discordMessage == null) return;
 
         String webhookName = translator.apply(messageFormat.getWebhookName(), false);
@@ -130,7 +121,7 @@ public class PlayerDeathListener implements Listener {
         TextChannel textChannel = DiscordSRV.getPlugin().getDestinationTextChannelForGameChannelName(channelName);
         if (postEvent.isUsingWebhooks()) {
             WebhookUtil.deliverMessage(textChannel, postEvent.getWebhookName(), postEvent.getWebhookAvatarUrl(),
-                    discordMessage.getContentRaw(), discordMessage.getEmbeds().stream().findFirst().orElse(null));
+                    discordMessage.getContent(), discordMessage.getEmbeds().stream().findFirst().orElse(null));
         } else {
             DiscordUtil.queueMessage(textChannel, discordMessage, true);
         }

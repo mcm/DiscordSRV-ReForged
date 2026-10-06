@@ -27,17 +27,17 @@ import github.scarsz.discordsrv.util.DiscordUtil;
 import github.scarsz.discordsrv.util.PlaceholderUtil;
 import github.scarsz.discordsrv.util.TimeUtil;
 import lombok.Getter;
-import net.dv8tion.jda.api.entities.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 public class ChannelUpdater extends Thread {
 
-    @Getter private final Set<UpdaterChannel> updaterChannels = new HashSet<>();
+    @Getter private final Set<UpdaterChannel> updaterChannels = ConcurrentHashMap.newKeySet();
 
     public ChannelUpdater() {
         setName("DiscordSRV - Channel Updater");
@@ -47,13 +47,15 @@ public class ChannelUpdater extends Thread {
         // Deleting and recreating the list of updater channels
         this.updaterChannels.clear();
 
-        final List<Map<?, ?>> configEntries = DiscordSRV.config().get("ChannelUpdater");
+        final Object configValue = DiscordSRV.config().get("ChannelUpdater");
+        if (!(configValue instanceof Collection)) return;
 
-        for (final Map<?, ?> configEntry : configEntries) {
+        for (final Object configEntry : (Collection<?>) configValue) {
+            if (!(configEntry instanceof Map)) continue;
             Dynamic map = Dynamic.from(configEntry);
             final String channelId = map.get("ChannelId").maybe().asString().orElse("");
             final String format = map.get("Format").maybe().asString().orElse("");
-            final Optional<Integer> optionalInteger = map.get("UpdateInterval").maybe().as(Integer.class);
+            final Optional<Integer> optionalInteger = map.get("UpdateInterval").maybe().convert().intoInteger();
             final String shutdownFormat = map.get("ShutdownFormat").maybe().asString().orElse("");
             final int interval;
 
@@ -150,7 +152,7 @@ public class ChannelUpdater extends Thread {
 
             String newName = this.shutdownFormat
                     .replaceAll("%time%|%date%", TimeUtil.timeStamp())
-                    .replace("%serverversion%", Bukkit.getBukkitVersion())
+                    .replace("%serverversion%", DiscordSRV.getPlatform().getServerVersion())
                     .replace("%totalplayers%", Integer.toString(DiscordSRV.getTotalPlayerCount()))
                     .replace("%timestamp%", Long.toString(System.currentTimeMillis() / 1000));
 

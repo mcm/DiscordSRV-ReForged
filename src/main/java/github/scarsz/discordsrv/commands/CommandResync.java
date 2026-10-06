@@ -25,8 +25,7 @@ import github.scarsz.discordsrv.objects.managers.GroupSynchronizationManager;
 import github.scarsz.discordsrv.util.LangUtil;
 import github.scarsz.discordsrv.util.MessageUtil;
 import github.scarsz.discordsrv.util.SchedulerUtil;
-import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
+import github.scarsz.discordsrv.platform.CommandSender;
 
 import java.util.concurrent.TimeUnit;
 
@@ -38,16 +37,16 @@ public class CommandResync {
     )
     public static void execute(CommandSender sender, String[] args) {
         if (!DiscordSRV.getPlugin().isGroupRoleSynchronizationEnabled()) {
-            MessageUtil.sendMessage(sender, ChatColor.RED + LangUtil.InternalMessage.RESYNC_WHEN_GROUP_SYNC_DISABLED.toString());
+            MessageUtil.sendMessage(sender, "§c" + LangUtil.InternalMessage.RESYNC_WHEN_GROUP_SYNC_DISABLED.toString());
             return;
         }
-        SchedulerUtil.runTaskAsynchronously(DiscordSRV.getPlugin(), () -> {
-            MessageUtil.sendMessage(sender, ChatColor.AQUA + "Full group synchronization triggered.");
+        SchedulerUtil.runTaskAsynchronously(() -> {
+            MessageUtil.sendMessage(sender, "§bFull group synchronization triggered.");
             long time = System.currentTimeMillis();
             DiscordSRV.getPlugin().getGroupSynchronizationManager().resyncEveryone(GroupSynchronizationManager.SyncCause.MANUAL);
             time = System.currentTimeMillis() - time;
             int seconds = Math.toIntExact(TimeUnit.MILLISECONDS.toSeconds(time));
-            MessageUtil.sendMessage(sender, ChatColor.AQUA + "Full group synchronization finished, taking " + seconds + " seconds.");
+            MessageUtil.sendMessage(sender, "§bFull group synchronization finished, taking " + seconds + " seconds.");
         });
     }
 

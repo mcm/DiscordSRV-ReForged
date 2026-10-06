@@ -20,7 +20,7 @@
 
 package github.scarsz.discordsrv.api.events;
 
-import org.bukkit.command.CommandSender;
+import github.scarsz.discordsrv.platform.CommandSender;
 
 /**
  * <p>Called directly after the configuration was reloaded and the requester was informed.</p>

@@ -28,8 +28,10 @@ import github.scarsz.discordsrv.util.DiscordUtil;
 import github.scarsz.discordsrv.util.LangUtil;
 import github.scarsz.discordsrv.util.PlaceholderUtil;
 import github.scarsz.discordsrv.util.TimeUtil;
-import net.dv8tion.jda.api.entities.TextChannel;
-import org.bukkit.Bukkit;
+import github.scarsz.discordsrv.objects.Lag;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 
 import java.util.concurrent.TimeUnit;
 
@@ -42,21 +44,22 @@ public class ServerWatchdog extends Thread {
     private long lastTick = System.currentTimeMillis();
     private boolean hasBeenTriggered = true;
 
+    /**
+     * Picks up the time of the last server tick (recorded by the platform every tick in {@link Lag})
+     */
     private void tick() {
-        lastTick = System.currentTimeMillis();
-        hasBeenTriggered = false;
+        long tick = Lag.getLastTick();
+        if (tick > lastTick) {
+            lastTick = tick;
+            hasBeenTriggered = false;
+        }
     }
 
     @Override
     public void run() {
-        int taskNumber = Bukkit.getScheduler().scheduleSyncRepeatingTask(DiscordSRV.getPlugin(), this::tick, 0, 20);
-        if (taskNumber == -1) {
-            DiscordSRV.debug(Debug.WATCHDOG, "Failed to schedule repeating task for server watchdog; returning");
-            return;
-        }
-
         while (true) {
             try {
+                tick();
                 int timeout = DiscordSRV.config().getInt("ServerWatchdogTimeout");
                 if (timeout < 10) timeout = 10; // minimum value
                 if (hasBeenTriggered || TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - lastTick) < timeout) {
@@ -87,7 +90,7 @@ public class ServerWatchdog extends Thread {
                             .replaceAll("%time%|%date%", TimeUtil.timeStamp())
                             .replace("%timestamp%", Long.toString(System.currentTimeMillis() / 1000))
                             .replace("%timeout%", Integer.toString(timeout))
-                            .replace("%guildowner%", DiscordSRV.getPlugin().getMainGuild().getOwner().getAsMention());
+                            .replace("%guildowner%", getGuildOwnerMention());
 
                     WatchdogMessagePostProcessEvent postEvent = DiscordSRV.api.callEvent(new WatchdogMessagePostProcessEvent(channelName, discordMessage, count, false));
                     if (postEvent.isCancelled()) {
@@ -110,6 +113,12 @@ public class ServerWatchdog extends Thread {
                 return;
             }
         }
+    }
+
+    private static String getGuildOwnerMention() {
+        Guild guild = DiscordSRV.getPlugin().getMainGuild();
+        Member owner = guild != null ? guild.getOwner() : null;
+        return owner != null ? owner.getAsMention() : "";
     }
 
 }

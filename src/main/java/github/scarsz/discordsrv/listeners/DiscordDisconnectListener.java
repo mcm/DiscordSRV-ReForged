@@ -21,8 +21,8 @@
 package github.scarsz.discordsrv.listeners;
 
 import github.scarsz.discordsrv.DiscordSRV;
-import net.dv8tion.jda.api.events.DisconnectEvent;
-import net.dv8tion.jda.api.events.ShutdownEvent;
+import net.dv8tion.jda.api.events.session.SessionDisconnectEvent;
+import net.dv8tion.jda.api.events.session.ShutdownEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.CloseCode;
 import net.dv8tion.jda.api.requests.GatewayIntent;
@@ -35,7 +35,7 @@ public class DiscordDisconnectListener extends ListenerAdapter {
     public static CloseCode mostRecentCloseCode = null;
 
     @Override
-    public void onDisconnect(@NotNull DisconnectEvent event) {
+    public void onSessionDisconnect(@NotNull SessionDisconnectEvent event) {
         handleCode(event.getCloseCode());
     }
 
@@ -53,7 +53,7 @@ public class DiscordDisconnectListener extends ListenerAdapter {
             Set<GatewayIntent> intents = DiscordSRV.api.getIntents();
             boolean presences = intents.contains(GatewayIntent.GUILD_PRESENCES);
 
-            DiscordSRV.getPlugin().disablePlugin(); // make DiscordSRV go red in /plugins
+            DiscordSRV.getPlugin().disablePlugin(); // mark DiscordSRV as disabled
             DiscordSRV.getPlugin().getLogger().severe("==============================================================");
             DiscordSRV.getPlugin().getLogger().severe(" ");
             DiscordSRV.getPlugin().getLogger().severe(" *** PLEASE FOLLOW THE INSTRUCTIONS BELOW TO GET DiscordSRV TO WORK *** ");
@@ -69,7 +69,7 @@ public class DiscordDisconnectListener extends ListenerAdapter {
             DiscordSRV.getPlugin().getLogger().severe(" ");
             DiscordSRV.getPlugin().getLogger().severe("==============================================================");
         } else if (!closeCode.isReconnect()) {
-            DiscordSRV.getPlugin().disablePlugin(); // make DiscordSRV go red in /plugins
+            DiscordSRV.getPlugin().disablePlugin(); // mark DiscordSRV as disabled
             printDisconnectMessage(false, closeCode == CloseCode.AUTHENTICATION_FAILED ? "The bot token is invalid" : closeCode.getMeaning());
         }
     }

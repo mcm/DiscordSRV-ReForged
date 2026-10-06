@@ -29,11 +29,8 @@ import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
+import github.scarsz.discordsrv.platform.CommandSender;
+import github.scarsz.discordsrv.platform.GamePlayer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,7 +50,7 @@ public class CommandLink {
             return;
         }
 
-        SchedulerUtil.runTaskAsynchronously(DiscordSRV.getPlugin(), () -> executeAsync(sender, args, manager));
+        SchedulerUtil.runTaskAsynchronously(() -> executeAsync(sender, args, manager));
     }
 
     @SuppressWarnings({"deprecation", "ConstantConditions"})
@@ -69,17 +66,18 @@ public class CommandLink {
             String minecraft = arguments.remove(0);
             String discord = String.join(" ", arguments);
 
-            OfflinePlayer offlinePlayer = null;
+            UUID playerUuid = null;
 
             try {
-                offlinePlayer = Bukkit.getOfflinePlayer(UUID.fromString(minecraft));
+                playerUuid = UUID.fromString(minecraft);
             } catch (IllegalArgumentException ignored) {}
 
-            if (offlinePlayer == null) offlinePlayer = Bukkit.getOfflinePlayer(minecraft);
-            if (offlinePlayer == null) {
-                MessageUtil.sendMessage(sender, ChatColor.RED + "Minecraft player could not be found");
+            if (playerUuid == null) playerUuid = CommandLinked.findPlayer(minecraft);
+            if (playerUuid == null) {
+                MessageUtil.sendMessage(sender, "§cMinecraft player could not be found");
                 return;
             }
+            String playerName = DiscordSRV.getPlatform().getPlayerName(playerUuid);
 
             User user = null;
             try {
@@ -87,27 +85,27 @@ public class CommandLink {
             } catch (IllegalArgumentException ignored) {}
 
             if (user == null) {
-                try {
-                    user = DiscordUtil.getJda().getUserByTag(discord);
-                } catch (IllegalArgumentException ignored) {}
+                // Discord no longer has discriminators, look up the user by their (unique) username
+                String username = discord.contains("#") ? discord.substring(0, discord.indexOf('#')) : discord;
+                user = DiscordUtil.getJda().getUsersByName(username, true).stream().findFirst().orElse(null);
             }
 
             if (user == null) {
-                MessageUtil.sendMessage(sender, ChatColor.RED + "Discord user could not be found");
+                MessageUtil.sendMessage(sender, "§cDiscord user could not be found");
                 return;
             }
 
-            DiscordSRV.getPlugin().getAccountLinkManager().link(user.getId(), offlinePlayer.getUniqueId());
-            MessageUtil.sendMessage(sender, ChatColor.GREEN + "Linked together " + ChatColor.GOLD + offlinePlayer.getName()
-                    + ChatColor.GREEN + " and " + ChatColor.GOLD + user.getAsTag());
+            DiscordSRV.getPlugin().getAccountLinkManager().link(user.getId(), playerUuid);
+            MessageUtil.sendMessage(sender, "§aLinked together §6" + (playerName != null ? playerName : minecraft)
+                    + "§a and §6" + user.getName());
             return;
         }
 
-        if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + LangUtil.InternalMessage.PLAYER_ONLY_COMMAND.toString());
+        if (!(sender instanceof GamePlayer)) {
+            sender.sendMessage("§c" + LangUtil.InternalMessage.PLAYER_ONLY_COMMAND.toString());
             return;
         }
-        Player player = (Player) sender;
+        GamePlayer player = (GamePlayer) sender;
 
         // prevent people from generating multiple link codes then claiming them all at once to get multiple rewards
         new ArrayList<>(manager.getLinkingCodes().entrySet()).stream()
@@ -123,8 +121,8 @@ public class CommandLink {
             String message = LangUtil.Message.CODE_GENERATED.toString()
                     .replace("%code%", code)
                     .replace("%botname%", DiscordSRV.getPlugin().getMainGuild().getSelfMember().getEffectiveName());
-            // replace additional placeholders (PlaceholderAPI)
-            message = PlaceholderUtil.replacePlaceholders(message, Bukkit.getOfflinePlayer(player.getUniqueId()));
+            // replace additional placeholders
+            message = PlaceholderUtil.replacePlaceholders(message, player);
             // build message component
             Component component = LegacyComponentSerializer.builder().character('&').extractUrls().build().deserialize(message);
 

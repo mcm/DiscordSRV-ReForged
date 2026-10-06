@@ -22,9 +22,8 @@ package github.scarsz.discordsrv.api.events;
 
 import github.scarsz.discordsrv.util.MessageUtil;
 import net.kyori.adventure.text.Component;
-import org.bukkit.entity.Player;
-import org.bukkit.event.Cancellable;
-import org.bukkit.event.Event;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import github.scarsz.discordsrv.api.Cancellable;
 
 /**
  * <p>Called before DiscordSRV has processed a Minecraft chat message, modifications may be overwritten by DiscordSRV's processing.</p>
@@ -33,29 +32,29 @@ import org.bukkit.event.Event;
  * the final message. You could change what they said using the {@link #setMessage(String)} method or use
  * {@link #setCancelled(boolean)} to cancel it from being processed altogether</p>
  *
- * <p>If a messages is coming from VentureChat over Bungee then {@link VentureChatMessagePreProcessEvent} would be called instead, due to the lack of the Player object</p>
+ * <p>If a messages is coming from VentureChat over Bungee then {@link VentureChatMessagePreProcessEvent} would be called instead, due to the lack of the GamePlayer object</p>
  */
 @SuppressWarnings({"LombokGetterMayBeUsed", "LombokSetterMayBeUsed"})
-public class GameChatMessagePreProcessEvent extends GameEvent<Event> implements Cancellable {
+public class GameChatMessagePreProcessEvent extends GameEvent<github.scarsz.discordsrv.platform.event.GameEvent> implements Cancellable {
 
     private boolean cancelled;
 
     private String channel;
     private Component messageComponent;
 
-    public GameChatMessagePreProcessEvent(String channel, Component message, Player player, Event event) {
+    public GameChatMessagePreProcessEvent(String channel, Component message, GamePlayer player, github.scarsz.discordsrv.platform.event.GameEvent event) {
         super(player, event);
         this.channel = channel;
         this.messageComponent = message;
     }
 
     @Deprecated
-    public GameChatMessagePreProcessEvent(String channel, Component message, Player player) {
+    public GameChatMessagePreProcessEvent(String channel, Component message, GamePlayer player) {
         this(channel, message, player, null);
     }
 
     @Deprecated
-    public GameChatMessagePreProcessEvent(String channel, String message, Player player) {
+    public GameChatMessagePreProcessEvent(String channel, String message, GamePlayer player) {
         this(channel, MessageUtil.toComponent(message, true), player);
     }
 

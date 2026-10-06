@@ -21,9 +21,9 @@
 package github.scarsz.discordsrv.api.events;
 
 import github.scarsz.discordsrv.objects.MessageFormat;
-import org.bukkit.entity.Player;
-import org.bukkit.event.Cancellable;
-import org.bukkit.event.entity.PlayerDeathEvent;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import github.scarsz.discordsrv.api.Cancellable;
+import github.scarsz.discordsrv.platform.event.PlayerDeathEvent;
 
 /**
  * <p>Called before DiscordSRV has processed a death message, modifications may be overwritten by DiscordSRV's processing.</p>
@@ -37,7 +37,7 @@ public class DeathMessagePreProcessEvent extends GameEvent<PlayerDeathEvent> imp
     private String channel;
     private MessageFormat messageFormat;
 
-    public DeathMessagePreProcessEvent(String channel, MessageFormat messageFormat, Player player, String deathMessage, PlayerDeathEvent triggeringBukkitEvent) {
+    public DeathMessagePreProcessEvent(String channel, MessageFormat messageFormat, GamePlayer player, String deathMessage, PlayerDeathEvent triggeringBukkitEvent) {
         super(player, triggeringBukkitEvent);
         this.channel = channel;
         this.messageFormat = messageFormat;
@@ -45,7 +45,7 @@ public class DeathMessagePreProcessEvent extends GameEvent<PlayerDeathEvent> imp
     }
 
     @Deprecated
-    public DeathMessagePreProcessEvent(String channel, MessageFormat messageFormat, Player player, String deathMessage) {
+    public DeathMessagePreProcessEvent(String channel, MessageFormat messageFormat, GamePlayer player, String deathMessage) {
         super(player, null);
         this.channel = channel;
         this.messageFormat = messageFormat;
@@ -53,7 +53,7 @@ public class DeathMessagePreProcessEvent extends GameEvent<PlayerDeathEvent> imp
     }
 
     @Deprecated
-    public DeathMessagePreProcessEvent(String channel, String message, Player player, String deathMessage) {
+    public DeathMessagePreProcessEvent(String channel, String message, GamePlayer player, String deathMessage) {
         super(player, null);
         this.channel = channel;
         MessageFormat messageFormat = new MessageFormat();

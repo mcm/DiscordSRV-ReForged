@@ -20,10 +20,14 @@
 
 package github.scarsz.discordsrv.objects;
 
-public class Lag implements Runnable {
+/**
+ * Tracks server ticks to calculate the TPS. {@link #tick()} is called by the platform at the end of every tick.
+ */
+public class Lag {
 
     private static final long[] TICKS = new long[600];
-    private static int TICK_COUNT = 0;
+    private static volatile int TICK_COUNT = 0;
+    private static volatile long LAST_TICK = 0;
 
     public static String getTPSString() {
         try {
@@ -47,9 +51,18 @@ public class Lag implements Runnable {
         return ticks / (elapsed / 1000.0D);
     }
 
-    public void run() {
-        TICKS[(TICK_COUNT % TICKS.length)] = System.currentTimeMillis();
+    public static void tick() {
+        long now = System.currentTimeMillis();
+        TICKS[(TICK_COUNT % TICKS.length)] = now;
+        LAST_TICK = now;
         TICK_COUNT += 1;
+    }
+
+    /**
+     * @return the time (epoch millis) of the last completed server tick, or 0 if the server hasn't ticked yet
+     */
+    public static long getLastTick() {
+        return LAST_TICK;
     }
 
 }

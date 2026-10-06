@@ -29,7 +29,7 @@ import github.scarsz.discordsrv.api.events.GuildSlashCommandUpdateEvent;
 import github.scarsz.discordsrv.util.LangUtil;
 import lombok.NonNull;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.Command;
@@ -38,9 +38,6 @@ import net.dv8tion.jda.api.requests.ErrorResponse;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
-import org.bukkit.Bukkit;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.java.PluginClassLoader;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.InvocationTargetException;
@@ -79,18 +76,19 @@ public class ApiManager extends ListenerAdapter {
     private final EnumSet<GatewayIntent> intents = EnumSet.of(
             // required for DiscordSRV's use
             GatewayIntent.GUILD_MEMBERS,
-            GatewayIntent.GUILD_BANS,
-            GatewayIntent.GUILD_EMOJIS,
+            GatewayIntent.GUILD_MODERATION,
+            GatewayIntent.GUILD_EXPRESSIONS,
             GatewayIntent.GUILD_VOICE_STATES,
             GatewayIntent.GUILD_MESSAGES,
-            GatewayIntent.DIRECT_MESSAGES
+            GatewayIntent.DIRECT_MESSAGES,
+            GatewayIntent.MESSAGE_CONTENT
     );
 
     private final EnumSet<CacheFlag> cacheFlags = EnumSet.of(
             // required for DiscordSRV's use
             CacheFlag.MEMBER_OVERRIDES,
             CacheFlag.VOICE_STATE,
-            CacheFlag.EMOTE
+            CacheFlag.EMOJI
     );
 
     /**
@@ -156,12 +154,6 @@ public class ApiManager extends ListenerAdapter {
 
     public void updateSlashCommands() {
         Set<PluginSlashCommand> commands = new HashSet<>();
-        for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {
-            if (plugin instanceof SlashCommandProvider) {
-                SlashCommandProvider provider = (SlashCommandProvider) plugin;
-                commands.addAll(provider.getSlashCommands());
-            }
-        }
         slashCommandProviders.forEach(p -> commands.addAll(p.getSlashCommands()));
 
         int conflictingCommands = 0;
@@ -208,7 +200,7 @@ public class ApiManager extends ListenerAdapter {
             long registeredGuilds = all.stream().filter(Objects::nonNull).count();
             int totalGuilds = DiscordSRV.getPlugin().getJda().getGuilds().size();
             if (successful > 0) {
-                DiscordSRV.info("Successfully registered " + successful + " slash commands (" + finalConflictingCommands + " conflicted) for " + pluginCount + " plugins in " + registeredGuilds + "/" + totalGuilds + " guilds (" + finalCancelledGuilds + " cancelled)");
+                DiscordSRV.info("Successfully registered " + successful + " slash commands (" + finalConflictingCommands + " conflicted) for " + pluginCount + " mods in " + registeredGuilds + "/" + totalGuilds + " guilds (" + finalCancelledGuilds + " cancelled)");
             } else {
                 DiscordSRV.info("Cleared all pre-existing slash commands in " + registeredGuilds + "/" + totalGuilds + " guilds (" + finalCancelledGuilds + " cancelled)");
             }
@@ -256,7 +248,6 @@ public class ApiManager extends ListenerAdapter {
      * @param provider the command data provider
      */
     public void addSlashCommandProvider(@NonNull SlashCommandProvider provider) {
-        if (provider instanceof Plugin) return; // plugins are always registered
         this.slashCommandProviders.add(provider);
     }
     /**
@@ -269,10 +260,10 @@ public class ApiManager extends ListenerAdapter {
     }
 
     /**
-     * Event listener for JDA {@link SlashCommandEvent}. Automatically routes events to {@link SlashCommand}-annotated methods on registered command providers.
+     * Event listener for JDA {@link SlashCommandInteractionEvent}. Automatically routes events to {@link SlashCommand}-annotated methods on registered command providers.
      */
     @Override
-    public void onSlashCommand(@NotNull SlashCommandEvent event) {
+    public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent event) {
         PluginSlashCommand commandData = runningCommandData.stream()
                 .filter(command -> command.isApplicable(event.getGuild()))
                 .filter(command -> command.getCommandData().getName().equals(event.getName()))
@@ -280,11 +271,6 @@ public class ApiManager extends ListenerAdapter {
         if (commandData == null) return;
 
         Set<SlashCommandProvider> providers = new HashSet<>();
-        for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {
-            if (plugin instanceof SlashCommandProvider) {
-                providers.add((SlashCommandProvider) plugin);
-            }
-        }
         providers.addAll(slashCommandProviders);
 
         boolean handled = false;
@@ -302,18 +288,18 @@ public class ApiManager extends ListenerAdapter {
     /**
      * Go through a {@link SlashCommandProvider} and invoke methods that listen to the provided slash command
      * @param provider the {@link SlashCommandProvider} to be searched and potentially invoked
-     * @param commandData the {@link PluginSlashCommand} data associated with this {@link SlashCommandEvent}
-     * @param event the {@link SlashCommandEvent} to be handled
+     * @param commandData the {@link PluginSlashCommand} data associated with this {@link SlashCommandInteractionEvent}
+     * @param event the {@link SlashCommandInteractionEvent} to be handled
      * @param priority only handlers with the given {@link SlashCommandPriority} will be invoked
      * @return whether a matching handler was found on the given provider
      */
-    private boolean handleSlashCommandEvent(SlashCommandProvider provider, PluginSlashCommand commandData, SlashCommandEvent event, SlashCommandPriority priority) {
+    private boolean handleSlashCommandEvent(SlashCommandProvider provider, PluginSlashCommand commandData, SlashCommandInteractionEvent event, SlashCommandPriority priority) {
         for (Method method : provider.getClass().getMethods()) {
             for (SlashCommand slashCommand : method.getAnnotationsByType(SlashCommand.class)) {
                 if (slashCommand.priority() != priority) continue;
                 if (!slashCommand.ignoreAcknowledged() && event.isAcknowledged()) continue;
-                if (!GlobPattern.compile(slashCommand.path()).matches(event.getCommandPath())) continue;
-                if (method.getParameters().length != 1 || !method.getParameters()[0].getType().equals(SlashCommandEvent.class)) continue;
+                if (!GlobPattern.compile(slashCommand.path()).matches(event.getFullCommandName().replace(' ', '/'))) continue;
+                if (method.getParameters().length != 1 || !method.getParameters()[0].getType().equals(SlashCommandInteractionEvent.class)) continue;
 
                 if (!slashCommand.deferReply()) {
                     invokeMethod(method, provider, event);
@@ -360,34 +346,27 @@ public class ApiManager extends ListenerAdapter {
     }
 
     /**
-     * Attempt to find the owning {@link Plugin} of the offending class and print the provided throwable to its logger
-     * @param offendingClass the offending plugin class
+     * Prints the provided throwable on behalf of the offending class
+     * @param offendingClass the offending class
      * @param throwable throwable to print
-     * @return whether the plugin was successfully determined
+     * @return whether the throwable was logged
      */
     private boolean logException(Class<?> offendingClass, Throwable throwable) {
-        try {
-            ClassLoader classLoader = offendingClass.getClassLoader();
-            if (classLoader instanceof PluginClassLoader) {
-                Plugin owner = ((PluginClassLoader) classLoader).getPlugin();
-                DiscordSRV.logThrowable(throwable, owner.getLogger()::severe);
-                return true;
-            }
-        } catch (Throwable ignored) {}
-        return false;
+        DiscordSRV.error("Exception thrown by API listener/slash command handler " + offendingClass.getName(), throwable);
+        return true;
     }
 
     /**
      * Check if the given event is acknowledged. If not, prints an error shaming the given plugin
      * @param event the event to check
-     * @param badPlugin the potentially bad plugin
+     * @param badPlugin the potentially bad plugin/mod
      */
-    private void ackCheck(SlashCommandEvent event, Plugin badPlugin) {
+    private void ackCheck(SlashCommandInteractionEvent event, Object badPlugin) {
         if (!event.isAcknowledged()) {
             DiscordSRV.error(String.format(
                     "Slash command \"/%s\" was not acknowledged by %s's handler! The command will show as failed on Discord until this is fixed!",
-                    event.getCommandPath().replace("/", " "),
-                    badPlugin.getName()
+                    event.getFullCommandName().replace(' ', '/').replace("/", " "),
+                    String.valueOf(badPlugin)
             ));
         }
     }

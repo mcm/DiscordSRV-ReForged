@@ -20,13 +20,12 @@
 
 package github.scarsz.discordsrv.util;
 
-import github.scarsz.configuralize.DynamicConfig;
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.config.DynamicConfig;
 import github.scarsz.discordsrv.objects.MessageFormat;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.Role;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.ChatColor;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -39,7 +38,7 @@ public class MessageFormatResolver {
         LangUtil.Message format = !selectedRoles.isEmpty() ? LangUtil.Message.CHAT_TO_MINECRAFT : LangUtil.Message.CHAT_TO_MINECRAFT_NO_ROLE;
 
         return DiscordSRV.config().getOptionalString(format.getKeyName() + "_" + channel)
-                .map(s -> ChatColor.translateAlternateColorCodes('&', s))
+                .map(MessageUtil::translateLegacy)
                 .orElseGet(format::toString);
     }
 
@@ -56,7 +55,8 @@ public class MessageFormatResolver {
         MessageFormat messageFormat = new MessageFormat();
 
         if (config.getOptional(key + ".Embed").isPresent() && config.getOptionalBoolean(key + ".Embed.Enabled").orElse(true)) {
-            Optional<String> hexColor = config.getOptionalString(key + ".Embed.Color");
+            Optional<String> hexColor = config.getOptional(key + ".Embed.Color")
+                    .filter(value -> value instanceof String).map(value -> (String) value);
             if (hexColor.isPresent()) {
                 String hex = hexColor.get().trim();
                 if (!hex.startsWith("#")) hex = "#" + hex;

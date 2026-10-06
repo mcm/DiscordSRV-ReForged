@@ -28,29 +28,21 @@ import github.scarsz.discordsrv.api.Subscribe;
 import github.scarsz.discordsrv.objects.ExpiringDualHashBidiMap;
 import github.scarsz.discordsrv.objects.Lag;
 import github.scarsz.discordsrv.objects.MessageFormat;
+import github.scarsz.discordsrv.platform.CommandSender;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import github.scarsz.discordsrv.platform.event.*;
 import github.scarsz.discordsrv.util.*;
-import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.TextChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
+import net.dv8tion.jda.api.utils.messages.MessageCreateData;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.bukkit.Bukkit;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
-import org.bukkit.event.*;
-import org.bukkit.event.player.PlayerCommandPreprocessEvent;
-import org.bukkit.event.player.PlayerEvent;
-import org.bukkit.event.server.ServerCommandEvent;
-import org.bukkit.plugin.RegisteredListener;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.expression.ParseException;
 import org.springframework.expression.spel.SpelEvaluationException;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
@@ -59,146 +51,57 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class AlertListener implements Listener, EventListener {
+/**
+ * Sends configurable messages to Discord when events happen. Alerts can be triggered by
+ * <ul>
+ *     <li>game events forwarded by the platform ({@link GameEvent}, eg. PlayerJoinEvent, PlayerQuitEvent,
+ *     PlayerChatEvent, PlayerDeathEvent, PlayerAdvancementDoneEvent, PlayerCommandEvent, ServerCommandEvent)</li>
+ *     <li>commands ("/command" triggers)</li>
+ *     <li>DiscordSRV API events</li>
+ *     <li>JDA events</li>
+ * </ul>
+ */
+public class AlertListener implements GameListener, EventListener {
 
     private static final Pattern VALID_CLASS_NAME_PATTERN = Pattern.compile("([\\p{L}_$][\\p{L}\\p{N}_$]*\\.)*[\\p{L}_$][\\p{L}\\p{N}_$]*");
-    private static final List<String> BLACKLISTED_CLASS_NAMES = Arrays.asList(
-            // Causes issues with logins with some plugins
-            "com.destroystokyo.paper.event.player.PlayerHandshakeEvent",
-            // Causes server to on to the main thread & breaks team color on Paper
-            "org.bukkit.event.player.PlayerChatEvent",
-            // We explicitly listen to these events
-            "org.bukkit.event.player.PlayerCommandPreprocessEvent",
-            "org.bukkit.event.server.ServerCommandEvent"
-    );
-    private static final List<String> SYNC_EVENT_NAMES = Arrays.asList(
-            // Needs to be sync because block data will be stale by time async task runs
-            "org.bukkit.event.block.BlockBreakEvent"
-    );
+    /**
+     * Names of Bukkit events (used by alerts made for the Spigot version of DiscordSRV) mapped to the name of the
+     * equivalent game event on this platform (all lower case)
+     */
+    private static final Map<String, String> EVENT_NAME_ALIASES = new HashMap<>();
 
-    private static final List<Class<?>> BLACKLISTED_CLASSES = new ArrayList<>();
+    static {
+        EVENT_NAME_ALIASES.put("asyncplayerchatevent", "playerchatevent");
+        EVENT_NAME_ALIASES.put("playercommandpreprocessevent", "playercommandevent");
+        EVENT_NAME_ALIASES.put("playerachievementawardedevent", "playeradvancementdoneevent");
+    }
 
     private final Map<String, String> validClassNameCache = new ExpiringDualHashBidiMap<>(TimeUnit.MINUTES.toMillis(1));
     private final Set<String> activeTriggers = new HashSet<>();
     private boolean anyCommandTrigger = false;
 
-    static {
-        for (String className : BLACKLISTED_CLASS_NAMES) {
-            try {
-                BLACKLISTED_CLASSES.add(Class.forName(className));
-            } catch (ClassNotFoundException ignored) {}
-        }
-    }
-
-    private final RegisteredListener listener;
     private final List<Dynamic> alerts = new ArrayList<>();
-    private boolean registered = false;
+    private volatile boolean registered = false;
 
     public AlertListener() {
-        listener = new RegisteredListener(
-                new Listener() {
-                    @Override
-                    public String toString() {
-                        return "DiscordSRV Alerts";
-                    }
-                },
-                (listener, event) -> runAlertsForEvent(event),
-                EventPriority.MONITOR,
-                DiscordSRV.getPlugin(),
-                false
-        );
         reloadAlerts();
     }
 
-    public void hackIntoAllHandlerLists() {
-        //
-        // Bukkit's API has no easy way to listen for all events
-        // The best thing you can do is add a listener to all the HandlerList's
-        // (and ignore some problematic events)
-        //
-        // Thus, we have to resort to making a proxy HandlerList.allLists list that adds our listener whenever a new
-        // handler list is created by an event being initialized
-        //
-        try {
-            Field allListsField = HandlerList.class.getDeclaredField("allLists");
-            allListsField.setAccessible(true);
-
-            if (Modifier.isFinal(allListsField.getModifiers())) {
-                try {
-                    Field modifiersField = Field.class.getDeclaredField("modifiers");
-                    modifiersField.setAccessible(true);
-                    modifiersField.setInt(allListsField, allListsField.getModifiers() & ~Modifier.FINAL);
-                } catch (NoSuchFieldException ignored) {
-                    // No can do
-                }
-            }
-
-            // set the HandlerList.allLists field to be a proxy list that adds our listener to all initializing lists
-            allListsField.set(null, new ArrayList<HandlerList>() {
-                {
-                    // add any already existing handler lists to our new proxy list
-                    synchronized (this) {
-                        this.addAll(HandlerList.getHandlerLists());
-                    }
-                }
-
-                @Override
-                public boolean addAll(Collection<? extends HandlerList> c) {
-                    boolean changed = false;
-                    for (HandlerList handlerList : c) {
-                        if (add(handlerList)) changed = true;
-                    }
-                    return changed;
-                }
-
-                @Override
-                public boolean add(HandlerList list) {
-                    boolean added = super.add(list);
-                    addListener(list);
-                    return added;
-                }
-            });
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            DiscordSRV.error(e);
-        }
-    }
-
-    private void addListener(HandlerList handlerList) {
-        for (Class<?> blacklistedClass : BLACKLISTED_CLASSES) {
-            try {
-                HandlerList list = (HandlerList) blacklistedClass.getMethod("getHandlerList").invoke(null);
-                if (handlerList == list) {
-                    DiscordSRV.debug(Debug.ALERTS, "Skipping registering HandlerList for " + blacklistedClass.getName() + " for alerts");
-                    return;
-                }
-            } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
-                DiscordSRV.debug(Debug.ALERTS, "Failed to check if HandlerList was for " + blacklistedClass.getName() + ": " + e.toString());
-            }
-        }
-        for (StackTraceElement stackTraceElement : Thread.currentThread().getStackTrace()) {
-            String match = BLACKLISTED_CLASS_NAMES.stream().filter(className -> stackTraceElement.getClassName().equals(className)).findAny().orElse(null);
-            if (match != null && stackTraceElement.getMethodName().equals("<clinit>")) {
-                DiscordSRV.debug(Debug.ALERTS, "Skipping registering HandlerList for " + match + " for alerts (during event init)");
-                return;
-            }
-        }
-        if (Arrays.stream(handlerList.getRegisteredListeners()).noneMatch(listener::equals)) handlerList.register(listener);
-    }
-
+    @SuppressWarnings("unchecked")
     public void reloadAlerts() {
         validClassNameCache.clear();
         activeTriggers.clear();
         anyCommandTrigger = false;
         alerts.clear();
-        Optional<List<Map<?, ?>>> optionalAlerts = DiscordSRV.config().getOptional("Alerts");
+        Optional<List<Map<?, ?>>> optionalAlerts = DiscordSRV.config().getOptional("Alerts")
+                .filter(object -> object instanceof List)
+                .map(object -> (List<Map<?, ?>>) object);
         if (registered) unregister();
 
         if (!optionalAlerts.isPresent() || optionalAlerts.get().isEmpty()) {
             return;
         }
 
-        List<String> simpleClassNames = new ArrayList<>();
-        Set<HandlerList> handlerLists = new HashSet<>();
         long count = optionalAlerts.get().size();
 
         for (Map<?, ?> map : optionalAlerts.get()) {
@@ -207,70 +110,27 @@ public class AlertListener implements Listener, EventListener {
             Set<String> triggers = getTriggers(alert);
 
             for (String trigger : triggers) {
+                if (trigger == null) continue;
                 if (trigger.startsWith("/")) {
                     anyCommandTrigger = true;
                     continue;
                 }
                 activeTriggers.add(trigger.toLowerCase(Locale.ROOT));
+                activeTriggers.add(normalizeTrigger(trigger));
 
-                if (!trigger.contains(".")) {
-                    simpleClassNames.add(trigger);
+                if (!trigger.contains(".") || isBukkitEventName(trigger)) {
+                    // game events are matched by name
                     continue;
                 }
 
                 try {
-                    Class<?> eventClass = Class.forName(getEventClassName(trigger));
-                    if (!Event.class.isAssignableFrom(eventClass)) {
-                        // Not a Bukkit event ignore (DiscordSRV & JDA events don't need to be registered explicitly)
-                        continue;
-                    }
-                    if (PlayerCommandPreprocessEvent.class.isAssignableFrom(eventClass)
-                            || ServerCommandEvent.class.isAssignableFrom(eventClass)) {
-                        // Already registered, don't register again
-                        continue;
-                    }
-
-                    Method method = null;
-                    Class<?> handlerListClass = eventClass;
-                    while (method == null && handlerListClass != null) {
-                        try {
-                            method = handlerListClass.getDeclaredMethod("getHandlerList");
-                        } catch (NoSuchMethodException ignored) {}
-                        handlerListClass = handlerListClass.getSuperclass();
-                    }
-
-                    if (method == null) {
-                        DiscordSRV.error("Could not find getHandlerList method for " + eventClass.getName());
-                        continue;
-                    }
-
-                    Object handlerList = method.invoke(null);
-                    if (!(handlerList instanceof HandlerList)) {
-                        DiscordSRV.error("Could not get HandlerList for " + eventClass.getName() + ": getHandlerList does not actually return a " + HandlerList.class.getName());
-                        continue;
-                    }
-
-                    if (!handlerLists.add((HandlerList) handlerList)) {
-                        // Ignore duplicate HandlerLists
-                        continue;
-                    }
-
-                    addListener((HandlerList) handlerList);
-                } catch (ClassNotFoundException ignored) {
+                    Class.forName(getEventClassName(trigger));
+                } catch (ClassNotFoundException | LinkageError ignored) {
                     DiscordSRV.warning("Could not find event for alert trigger: " + trigger);
-                } catch (InvocationTargetException | IllegalAccessException e) {
-                    DiscordSRV.error("Could not get HandlerList for event " + trigger, e);
                 }
             }
         }
 
-        if (!simpleClassNames.isEmpty()) {
-            DiscordSRV.warning("Some alerts are using simple class names as triggers (instead of fully-classified class names including the package name), server performance may be effected.");
-            DiscordSRV.warning("Support for simple class names will be removed in a future release of DiscordSRV");
-            DiscordSRV.warning("The following triggers are causing this notification: " + String.join(", ", simpleClassNames));
-            DiscordSRV.warning("Read https://docs.discordsrv.com/alerts/migration for more information");
-            hackIntoAllHandlerLists();
-        }
         registered = true;
         DiscordSRV.info(optionalAlerts.get().size() + " alert" + (count > 1 ? "s" : "") + " registered");
     }
@@ -279,8 +139,10 @@ public class AlertListener implements Listener, EventListener {
         return alerts;
     }
 
+    /**
+     * Stops alerts from being processed (until they're reloaded)
+     */
     public void unregister() {
-        HandlerList.unregisterAll(listener.getListener());
         registered = false;
     }
 
@@ -294,47 +156,50 @@ public class AlertListener implements Listener, EventListener {
         runAlertsForEvent(event);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerCommandPreprocess(PlayerCommandPreprocessEvent event) {
+    @Override
+    public void onPlayerJoin(PlayerJoinEvent event) {
         runAlertsForEvent(event);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @Override
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        runAlertsForEvent(event);
+    }
+
+    @Override
+    public void onPlayerChat(PlayerChatEvent event) {
+        runAlertsForEvent(event);
+    }
+
+    @Override
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        runAlertsForEvent(event);
+    }
+
+    @Override
+    public void onPlayerAdvancementDone(PlayerAdvancementDoneEvent event) {
+        runAlertsForEvent(event);
+    }
+
+    @Override
+    public void onPlayerCommand(PlayerCommandEvent event) {
+        runAlertsForEvent(event);
+    }
+
+    @Override
     public void onServerCommand(ServerCommandEvent event) {
         runAlertsForEvent(event);
     }
 
     private void runAlertsForEvent(Object event) {
-        boolean command = event instanceof PlayerCommandPreprocessEvent || event instanceof ServerCommandEvent;
+        if (!registered) return;
+        boolean command = event instanceof PlayerCommandEvent || event instanceof ServerCommandEvent;
 
         String eventClassName = getEventClassName(event);
         boolean active = (command && anyCommandTrigger)
                 || activeTriggers.contains(eventClassName.toLowerCase(Locale.ROOT))
                 || activeTriggers.contains(getEventName(event).toLowerCase(Locale.ROOT));
-        if (!active) {
-            if (event instanceof Event) {
-                // remove us from HandlerLists that we don't need (we can do this here, since we have the full class name)
-                // but we need to ignore events where the HandlerList may be inherited from a super class
-                Class<?> checkClass = event.getClass().getSuperclass();
-
-                boolean anySuperClassHasHandlersMethod = false;
-                while (checkClass != null) {
-                    try {
-                        checkClass.getDeclaredMethod("getHandlers");
-                        anySuperClassHasHandlersMethod = true;
-                        break;
-                    } catch (NoSuchMethodException ignored) {}
-
-                    checkClass = checkClass.getSuperclass();
-                }
-
-                if (!anySuperClassHasHandlersMethod) {
-                    HandlerList handlerList = ((Event) event).getHandlers();
-                    handlerList.unregister(this);
-                }
-            }
-            return;
-        }
+        if (!active) return;
 
         for (int i = 0; i < alerts.size(); i++) {
             Dynamic alert = alerts.get(i);
@@ -349,16 +214,9 @@ public class AlertListener implements Listener, EventListener {
                 }
             }
 
-            for (String syncName : SYNC_EVENT_NAMES) {
-                if (eventClassName.equals(syncName)) {
-                    async = false;
-                    break;
-                }
-            }
-
             if (async) {
                 int alertIndex = i;
-                SchedulerUtil.runTaskAsynchronously(DiscordSRV.getPlugin(), () -> process(event, alert, triggers, alertIndex));
+                SchedulerUtil.runTaskAsynchronously(() -> process(event, alert, triggers, alertIndex));
             } else {
                 process(event, alert, triggers, i);
             }
@@ -403,19 +261,34 @@ public class AlertListener implements Listener, EventListener {
         return className.replace("github.scarsz.discordsrv.dependencies.jda", "net.".concat("dv8tion.jda"));
     }
 
+    /**
+     * Converts the given (non-command) trigger to the lower case name of the event it should match,
+     * translating the names of Bukkit events to the equivalent game event names of this platform
+     */
+    private static String normalizeTrigger(String trigger) {
+        String name = trigger;
+        if (isBukkitEventName(name)) name = name.substring(name.lastIndexOf('.') + 1);
+        name = name.toLowerCase(Locale.ROOT);
+        return EVENT_NAME_ALIASES.getOrDefault(name, name);
+    }
+
+    private static boolean isBukkitEventName(String trigger) {
+        return trigger.startsWith("org.bukkit.") || trigger.startsWith("io.papermc.") || trigger.startsWith("com.destroystokyo.paper.");
+    }
+
     private String getEventName(Object event) {
-        return event instanceof Event ? ((Event) event).getEventName() : event.getClass().getSimpleName();
+        return event instanceof GameEvent ? ((GameEvent) event).getEventName() : event.getClass().getSimpleName();
     }
 
     private void process(Object event, Dynamic alert, Set<String> triggers, int alertIndex) {
-        Player player = event instanceof PlayerEvent ? ((PlayerEvent) event).getPlayer() : null;
+        GamePlayer player = event instanceof PlayerGameEvent ? ((PlayerGameEvent) event).getPlayer() : null;
         if (player == null) {
             // some things that do deal with players are not properly marked as a player event
             // this will check to see if a #getPlayer() method exists on events coming through
             try {
                 Method getPlayerMethod = event.getClass().getMethod("getPlayer");
-                if (getPlayerMethod.getReturnType().equals(Player.class)) {
-                    player = (Player) getPlayerMethod.invoke(event);
+                if (GamePlayer.class.isAssignableFrom(getPlayerMethod.getReturnType())) {
+                    player = (GamePlayer) getPlayerMethod.invoke(event);
                 }
             } catch (Exception ignored) {
                 // we tried ¯\_(ツ)_/¯
@@ -426,9 +299,10 @@ public class AlertListener implements Listener, EventListener {
         String command = null;
         List<String> args = new LinkedList<>();
 
-        if (event instanceof PlayerCommandPreprocessEvent) {
+        if (event instanceof PlayerCommandEvent) {
             sender = player;
-            command = ((PlayerCommandPreprocessEvent) event).getMessage().substring(1);
+            command = ((PlayerCommandEvent) event).getCommand();
+            if (command.startsWith("/")) command = command.substring(1);
         } else if (event instanceof ServerCommandEvent) {
             sender = ((ServerCommandEvent) event).getSender();
             command = ((ServerCommandEvent) event).getCommand();
@@ -453,11 +327,11 @@ public class AlertListener implements Listener, EventListener {
                 if (StringUtils.isBlank(command) || !command.toLowerCase().split("\\s+|$", 2)[0].equals(trigger.substring(1))) continue;
             } else {
                 // make sure the called event matches what this alert is supposed to trigger on
-                if (!eventClassName.equals(trigger) && !eventName.equalsIgnoreCase(trigger)) continue;
+                if (!eventClassName.equals(trigger) && !eventName.equalsIgnoreCase(normalizeTrigger(trigger))) continue;
             }
 
             // make sure alert should run even if event is cancelled
-            if (event instanceof Cancellable && ((Cancellable) event).isCancelled()) {
+            if (event instanceof PlayerChatEvent && ((PlayerChatEvent) event).isCancelled()) {
                 Dynamic ignoreCancelledDynamic = alert.get("IgnoreCancelled");
                 boolean ignoreCancelled = ignoreCancelledDynamic.isPresent() ? ignoreCancelledDynamic.as(Boolean.class) : true;
                 if (ignoreCancelled) {
@@ -519,7 +393,7 @@ public class AlertListener implements Listener, EventListener {
                             Boolean value = new SpELExpressionBuilder(expression)
                                     .withPluginVariables()
                                     .withVariable("event", event)
-                                    .withVariable("server", Bukkit.getServer())
+                                    .withVariable("server", DiscordSRV.getPlatform())
                                     .withVariable("discordsrv", DiscordSRV.getPlugin())
                                     .withVariable("player", player)
                                     .withVariable("sender", sender)
@@ -546,14 +420,14 @@ public class AlertListener implements Listener, EventListener {
                 CommandSender finalSender = sender;
                 String finalCommand = command;
 
-                Player finalPlayer = player;
+                GamePlayer finalPlayer = player;
                 BiFunction<String, Boolean, String> translator = (content, needsEscape) -> {
                     if (content == null) return null;
 
                     // evaluate any SpEL expressions
                     Map<String, Object> variables = new HashMap<>();
                     variables.put("event", event);
-                    variables.put("server", Bukkit.getServer());
+                    variables.put("server", DiscordSRV.getPlatform());
                     variables.put("discordsrv", DiscordSRV.getPlugin());
                     variables.put("player", finalPlayer);
                     variables.put("sender", finalSender);
@@ -573,14 +447,14 @@ public class AlertListener implements Listener, EventListener {
                             case "date":
                                 return TimeUtil.timeStamp();
                             case "ping":
-                                return finalPlayer != null ? PlayerUtil.getPing(finalPlayer) : "-1";
+                                return finalPlayer != null ? String.valueOf(PlayerUtil.getPing(finalPlayer)) : "-1";
                             case "name":
                             case "username":
                                 return finalPlayer != null ? finalPlayer.getName() : "";
                             case "displayname":
                                 return finalPlayer != null ? MessageUtil.strip(needsEscape ? DiscordUtil.escapeMarkdown(finalPlayer.getDisplayName()) : finalPlayer.getDisplayName()) : "";
                             case "world":
-                                return finalPlayer != null ? finalPlayer.getWorld().getName() : "";
+                                return finalPlayer != null ? finalPlayer.getWorldName() : "";
                             case "embedavatarurl":
                                 return finalPlayer != null ? DiscordSRV.getAvatarUrl(finalPlayer) : DiscordUtil.getJda().getSelfUser().getEffectiveAvatarUrl();
                             case "botavatarurl":
@@ -597,7 +471,7 @@ public class AlertListener implements Listener, EventListener {
                     return content;
                 };
 
-                Message message = DiscordSRV.translateMessage(messageFormat, translator);
+                MessageCreateData message = DiscordSRV.translateMessage(messageFormat, translator);
                 if (message == null) {
                     DiscordSRV.debug(Debug.ALERTS, "Not sending alert because it is configured to have no message content");
                     return;
@@ -607,7 +481,7 @@ public class AlertListener implements Listener, EventListener {
                     WebhookUtil.deliverMessage(textChannel,
                             translator.apply(messageFormat.getWebhookName(), false),
                             translator.apply(messageFormat.getWebhookAvatarUrl(), false),
-                            message.getContentRaw(), message.getEmbeds().stream().findFirst().orElse(null));
+                            message.getContent(), message.getEmbeds().stream().findFirst().orElse(null));
                 } else {
                     DiscordUtil.queueMessage(textChannel, message);
                 }

@@ -1,5 +1,5 @@
-# DiscordSRV Configuration
-# Need help? Join our Discord, https://discordsrv.com/discord
+# DiscordSRV Configuration (DiscordSRV ReForged, NeoForge port)
+# Need help? https://github.com/mcm/DiscordSRV-ReForged/issues
 
 # Don't touch pls
 ConfigVersion: ${version}
@@ -12,15 +12,12 @@ BotToken: "BOTTOKEN"
 # syntax is Channels: {"in-game channel name from Minecraft": "numerical channel ID from Discord", "another in-game channel name from Minecraft": "another numerical channel ID from Discord"}
 #
 # All of DiscordSRV's messages will go to the first channel unless there's a channel for that type of messages defined:
-# when using a compatible chat plugin, the channel name will be the one from that plugin (for chat messages)
-#  - If you're using TownyChat, the default channel is usually called "general" instead of "global"
-# for player chat messages (when not using a chat plugin): global
+# for player chat messages: global
 # for server start/stop messages: status
 # for achievement/advancement messages: awards
 # for death messages: deaths
 # for join messages: join
 # for leave messages: leave
-# for dynmap messages: dynmap
 # for watchdog messages: watchdog
 # for /discord broadcast: broadcasts (unless specified in the command)
 # for account linking: link
@@ -66,9 +63,7 @@ Experiment_MCDiscordReserializer_InBroadcast: false
 # Other
 CancelConsoleCommandIfLoggingFailed: true
 ForcedLanguage: none
-ForceTLSv12: true
 NoopHostnameVerifier: false
-MaximumAttemptsForSystemDNSBeforeUsingFallbackDNS: 3
 TimestampFormat: EEE, d. MMM yyyy HH:mm:ss z
 DateFormat: yyyy-MM-dd
 # https://docs.discordsrv.com/config/#Timezone
@@ -76,17 +71,12 @@ Timezone: default
 # MinecraftMentionSound: Whether a sound should be sent to the player in Minecraft when they are mentioned from Discord
 MinecraftMentionSound: true
 
-# Plugin hooks
-# You must restart your server after changing these options
+# Presence information
+# You must restart your server after changing this option
 #
-# DisabledPluginHooks: plugin hooks that will not be used (usually just the name of the plugin).
-# VentureChatBungee: enables the VentureChat hook's BungeeCord functionality (messages are received from every server, requires atleast 1 player to be online)
-# EnablePresenceInformation: enabled presence information, which is required for some of our PlaceholderAPI placeholders. Keep in mind this requires the "Presence Intent" from the Discord developer portal
-# UseModernPaperChatEvent: only use this if you have a chat plugins that SPECIFICALLY utilizes Paper's "AsyncChatEvent"
-DisabledPluginHooks: []
-VentureChatBungee: false
+# EnablePresenceInformation: enables presence information (online status/activities of Discord members) for mods using DiscordSRV's API.
+#                            Keep in mind this requires the "Presence Intent" from the Discord developer portal
 EnablePresenceInformation: false
-UseModernPaperChatEvent: false
 
 # Game Information
 # Sets the user status for the bot
@@ -94,7 +84,7 @@ UseModernPaperChatEvent: false
 # You can preface the status with "playing", "watching", "listening to", or "competing" to set the activity type
 # You can set your own custom status by not including the prefixes
 #    %online%: number of online players
-#    PlaceholderAPI placeholders are supported
+#    Built-in placeholders such as %server_tps% are supported (see the README)
 #
 # DiscordGameStatus: Text to display. Can be a single value e.g. "Minecraft", or multiple values e.g. ["Minecraft", "yourip.changeme.com"]
 # DiscordOnlineStatus: Activity status to display. This must be one of the following: ONLINE, DND, IDLE or INVISIBLE
@@ -159,7 +149,7 @@ DiscordChatChannelRoleAliases: {"Developer": "Dev"}
 # DiscordConsoleChannelUsageLog:
 #    %date%:  current date
 #              example: 2017-01-01
-#    PlaceholderAPI placeholders are supported
+#    Built-in placeholders (see the README) are supported
 # DiscordConsoleChannelBlacklistActsAsWhitelist: whether the blacklisted commands list acts as a whitelist instead of blacklist
 # DiscordConsoleChannelBlacklistedCommands: phrases wrapped in quotation marks that users should not be able to send as commands to the console
 # DiscordConsoleChannelFilters: regex filters to be applied to console lines being sent to Discord, if the result is empty the message won't be sent at all
@@ -237,11 +227,11 @@ ChannelTopicUpdaterRateInMinutes: 10
 #     %playercount%:   current player count
 #     %playermax%:     maximum player count
 #     %date%:          current date and time
-#     %totalplayers%:  total number of players to ever join the main world
+#     %totalplayers%:  total number of players to ever join the server
 #     %uptimemins%:    number of minutes since DiscordSRV has started
 #     %uptimehours%:   number of hours since DiscordSRV has started
 #     %motd%:          motd of the server
-#     %serverversion%: server version such as Spigot-1.9
+#     %serverversion%: server version such as NeoForge 21.1.252 (MC: 1.21.1)
 #     %freememory%:    free memory of the JVM in MB
 #     %usedmemory%:    used memory of the JVM in MB
 #     %totalmemory%:   total memory of the JVM in MB
@@ -251,7 +241,7 @@ ChannelTopicUpdaterRateInMinutes: 10
 #     %totalmemorygb%: total memory of the JVM in GB
 #     %maxmemorygb%:   max memory of the JVM in GB
 #     %tps%:           average TPS of the server
-#     PlaceholderAPI placeholders are also supported
+#     Built-in placeholders (see the README) are also supported
 #   ShutdownFormat: The format the channel should take when the server has shut down. Available placeholders:
 #     %time% or %date%: current date and time
 #     %serverversion%:  server version
@@ -274,7 +264,7 @@ ChannelUpdater:
 #
 # Syntax is {"TRIGGER": "RESPONSE", "TRIGGER": "RESPONSE", ...}
 # If you do not want any canned responses, set this to just {}
-# PlaceholderAPI placeholders are supported for the values
+# Built-in placeholders are supported for the values
 #
 DiscordCannedResponses: {"!ip": "yourserveripchange.me", "!site": "http://yoursiteurl.net"}
 
@@ -310,7 +300,7 @@ MinecraftDiscordAccountLinkedMessageDeleteSeconds: 0
 # If the time since the last tick goes above the set interval in seconds, Discord messages can be triggered
 #
 # ServerWatchdogEnabled: whether the watchdog is enabled at all
-# ServerWatchdogTimeout: time in seconds that need to elapse before the watchdog takes action (Spigot's crash detection uses 60 for this)
+# ServerWatchdogTimeout: time in seconds that need to elapse before the watchdog takes action (the vanilla watchdog uses max-tick-time, 60 seconds by default)
 #                        the minimum for this value is 10
 # ServerWatchdogMessageCount: the amount of times ServerWatchdogMessage is sent. useful if you *really* want to make sure you know something's up
 #

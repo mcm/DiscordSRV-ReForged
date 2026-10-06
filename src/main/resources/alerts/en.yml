@@ -1,10 +1,20 @@
 # This is an /advanced/ feature of DiscordSRV that allows you to send messages to Discord when a game event happens
-# or when a command is run. You will need a working knowledge of how Bukkit events work and their properties.
+# or when a command is run. You will need a working knowledge of the available events and their properties.
 # If you aren't sure about what you're doing here, maybe ask a developer or join our support server @ discordsrv.com/discord
 # Made something you'd like to share? You can do so in our Discord server's #alerts forum (invite above)
 #
-# Refer to the Bukkit API javadoc to find events & properties to use:
-#  https://hub.spigotmc.org/javadocs/bukkit
+# The following game events can be used as triggers (properties can be used directly in conditions/expressions):
+#  PlayerJoinEvent - a player joined (properties: player, joinMessage)
+#  PlayerQuitEvent - a player left (properties: player, quitMessage)
+#  PlayerChatEvent - a player sent a chat message (properties: player, message, cancelled); AsyncPlayerChatEvent also works
+#  PlayerDeathEvent - a player died (properties: player, deathMessage)
+#  PlayerAdvancementDoneEvent - a player completed an advancement (properties: player, advancementId, title, description, frame, announceToChat)
+#  PlayerCommandEvent - a player ran a command (properties: player, command)
+#  ServerCommandEvent - the console (or a command block etc.) ran a command (properties: sender, command)
+# Messages (joinMessage, deathMessage, title...) are Adventure text components.
+# DiscordSRV API events (eg. AccountLinkedEvent) and JDA events (eg. GuildMemberJoinEvent) can be used as triggers too.
+# Players (#player, the player property of events) have these properties: name, uniqueId, displayName, worldName,
+#  x, y, z, ping, vanished, and the method hasPermission("permission.node")
 # Helpful resources for learning how to use SpEL:
 #  https://docs.spring.io/spring/docs/4.2.x/spring-framework-reference/html/expressions.html
 #  https://dzone.com/articles/learn-spring-expression-language-with-examples
@@ -23,21 +33,19 @@
 #  {embedavatarurl} - if alert is for a player event, the avatar url for the player's head, otherwise, the bot's avatar url
 #  {botavatarurl} - the bot's avatar url
 #  {botname} - the bot's name
-#  %placeholder% - any PlaceholderAPI placeholders, can only use player ones when alert is for a player event
+#  %placeholder% - any of DiscordSRV's placeholders, can only use player ones when alert is for a player event
 #
 # You can also use SpEL expressions with ${expression...}, such as...
-#  - Getting a player's IP: ${#player.address.address.hostAddress}
-#  - Getting a player's game mode: ${#player.gameMode.name()}
+#  - Getting a player's coordinates: ${#player.x.intValue()}, ${#player.y.intValue()}, ${#player.z.intValue()}
 #  - Getting a player's linked Discord account ID: ${#discordsrv.accountLinkManager.getDiscordId(#player.uniqueId)}
 #  - Getting the online player count: ${#server.onlinePlayers.size()}
 #  - Getting the status of DiscordSRV's connection to Discord: ${#jda.status.name()}
-#  - Checking if a player is in a specific world: ${#player.world.name == 'world_the_end'}
-#  - Checking if it's day in the world that the player is in: ${#player.world.time > 0 && #player.world.time < 13000}
+#  - Checking if a player is in a specific world (dimension): ${#player.worldName == 'the_end'}
 #  You can use the following expression placeholders, as seen above:
-#   #plugins.<plugin> - the specified plugin instance, null if doesn't exist
+#   #plugins.DiscordSRV - the DiscordSRV instance
 #   #event - the event that's triggering the alert if this alert is an event alert
-#   #server - the Bukkit API server instance, equivalent to Bukkit#getServer
-#   #discordsrv - the DiscordSRV plugin instance
+#   #server - DiscordSRV's access to the server (online players, max players, motd, bans, whitelist...)
+#   #discordsrv - the DiscordSRV instance
 #   #player - the player that the event is for, if this is a player event or command
 #   #sender - the command sender, if this is a command alert
 #   #command - the full command, with no leading slash, if this is a command alert
@@ -78,27 +86,27 @@
 #      Timestamp: false # set to true to use the time the message was sent or use a epoch timestamp for a specific time (https://www.epochconverter.com/)
 #
 Alerts:
-  # Example config to send messages to the "fish" DiscordSRV channel when a player successfully catches a fish
-  #- Trigger: org.bukkit.event.player.PlayerFishEvent
-  #  Channel: fish
+  # Example config to send messages to the "challenges" DiscordSRV channel when a player completes a challenge advancement
+  #- Trigger: PlayerAdvancementDoneEvent
+  #  Channel: challenges
   #  Conditions:
-  #    - state.name() == 'CAUGHT_FISH'
+  #    - frame == 'challenge'
   #  Embed:
-  #    Color: "#00ff00"
+  #    Color: "#aa00aa"
   #    Author:
   #      ImageUrl: "{embedavatarurl}"
-  #      Name: "{name} caught a ${caught.itemStack.type.name()}!"
+  #      Name: "{name} completed the challenge ${advancementId}!"
 
-  # Example config to send Matrix anti-cheat messages
-  #- Trigger: me.rerere.matrix.api.events.PlayerViolationEvent
-  #  Channel: matrix
+  # Example config to send messages to the "deaths" DiscordSRV channel when a player dies in the nether
+  #- Trigger: PlayerDeathEvent
+  #  Channel: deaths
   #  Conditions:
-  #    - violations >= 5 # don't send events for players with < 5 violations
+  #    - "#player.worldName == 'the_nether'"
   #  Embed:
   #    Color: "#ff0000"
   #    Author:
   #      ImageUrl: "{embedavatarurl}"
-  #      Name: "{username} failed ${hackType.name().toLowerCase()} check | ${component} | vl:${violations} ping:${player.handle.ping} tps:{tps}"
+  #      Name: "{username} died in the nether at ${#player.x.intValue()}, ${#player.y.intValue()}, ${#player.z.intValue()} | ping:{ping} tps:{tps}"
 
   # Example config to send /gamemode messages
   #- Trigger: /gamemode

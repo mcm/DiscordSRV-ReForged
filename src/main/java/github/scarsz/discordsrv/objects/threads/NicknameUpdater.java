@@ -31,16 +31,16 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.requests.ErrorResponse;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
+import github.scarsz.discordsrv.platform.GamePlayer;
 
-import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 public class NicknameUpdater extends Thread {
 
-    private final Set<String> nonMembers = new HashSet<>();
+    private final Set<String> nonMembers = ConcurrentHashMap.newKeySet();
 
     public NicknameUpdater() {
         setName("DiscordSRV - Nickname Updater");
@@ -67,7 +67,9 @@ public class NicknameUpdater extends Thread {
                 }
 
                 Guild guild = DiscordSRV.getPlugin().getMainGuild();
-                for (Player onlinePlayer : PlayerUtil.getOnlinePlayers()) {
+                if (guild == null) {
+                    DiscordSRV.debug(Debug.NICKNAME_SYNC, "No main guild available, not setting nicknames");
+                } else for (GamePlayer onlinePlayer : PlayerUtil.getOnlinePlayers()) {
                     String playerName = onlinePlayer.getName();
                     // skip vanished players
                     if (PlayerUtil.isVanished(onlinePlayer)) {
@@ -96,7 +98,7 @@ public class NicknameUpdater extends Thread {
                     // get the member, from cache if it's there otherwise from Discord
                     Member member;
                     try {
-                        member = guild.retrieveMember(linkedUser, false).complete();
+                        member = guild.retrieveMember(linkedUser).complete(); // uses the cache if the member is cached
                     } catch (ErrorResponseException e) {
                         if (e.getErrorResponse() == ErrorResponse.UNKNOWN_MEMBER) {
                             nonMembers.add(linkedUser.getId());
@@ -122,12 +124,23 @@ public class NicknameUpdater extends Thread {
         }
     }
 
-    public void setNickname(Member member, OfflinePlayer offlinePlayer) {
+    public void setNickname(Member member, GamePlayer player) {
+        if (player == null) return;
+        setNickname(member, player.getUniqueId(), player);
+    }
+
+    public void setNickname(Member member, UUID playerUuid) {
+        if (playerUuid == null) return;
+        setNickname(member, playerUuid, DiscordSRV.getPlatform().getPlayer(playerUuid));
+    }
+
+    private void setNickname(Member member, UUID playerUuid, GamePlayer player) {
         if (member == null) return; // prevent NPE when called on join
 
+        String playerName;
         String nickname;
-        if (offlinePlayer.isOnline()) {
-            Player player = offlinePlayer.getPlayer();
+        if (player != null) {
+            playerName = player.getName();
 
             if (!player.hasPermission("discordsrv.nicknamesync")) {
                 DiscordSRV.debug(Debug.NICKNAME_SYNC, "Not syncing nicknames for " + player.getName() + " because they do not have the discordsrv.nicknamesync permission.");
@@ -135,20 +148,26 @@ public class NicknameUpdater extends Thread {
             }
 
             DiscordSRV.debug(Debug.NICKNAME_SYNC, "Syncing nickname for " + player.getName());
+            String displayName = player.getDisplayName();
             nickname = DiscordSRV.config().getString("NicknameSynchronizationFormat")
-                    .replace("%displayname%", player.getDisplayName() != null ? player.getDisplayName() : player.getName())
+                    .replace("%displayname%", displayName != null && !displayName.isEmpty() ? displayName : player.getName())
                     .replace("%username%", player.getName())
                     .replace("%discord_name%", member.getUser().getName())
-                    .replace("%discord_discriminator%", member.getUser().getDiscriminator());
+                    .replace("%discord_discriminator%", "0"); // discriminators no longer exist
 
             nickname = PlaceholderUtil.replacePlaceholders(nickname, player);
         } else {
-            nickname = offlinePlayer.getName();
+            playerName = DiscordSRV.getPlatform().getPlayerName(playerUuid);
+            nickname = playerName;
+        }
+        if (nickname == null) {
+            DiscordSRV.debug(Debug.NICKNAME_SYNC, "Unknown name for " + playerUuid + ", not setting nickname");
+            return;
         }
 
         nickname = MessageUtil.strip(nickname);
         if (nickname.length() > 32) {
-            DiscordSRV.debug(Debug.NICKNAME_SYNC, "The new nickname for " + offlinePlayer.getName() + " (" + nickname + ") is too long, reducing it to 32 characters.");
+            DiscordSRV.debug(Debug.NICKNAME_SYNC, "The new nickname for " + playerName + " (" + nickname + ") is too long, reducing it to 32 characters.");
             nickname = nickname.substring(0, 32);
         }
         DiscordUtil.setNickname(member, nickname);

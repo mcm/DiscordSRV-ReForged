@@ -20,12 +20,10 @@
 
 package github.scarsz.discordsrv.util;
 
-import com.github.zafarkhaja.semver.Version;
-import github.scarsz.configuralize.ParseException;
-import github.scarsz.configuralize.Provider;
-import github.scarsz.configuralize.Source;
 import github.scarsz.discordsrv.DiscordSRV;
-import org.apache.commons.io.FileUtils;
+import github.scarsz.discordsrv.config.DynamicConfig;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
@@ -42,30 +40,26 @@ public class ConfigUtil {
         if (configVersionRaw.contains("/")) configVersionRaw = configVersionRaw.substring(0, configVersionRaw.indexOf("/"));
         if (configVersionRaw.contains("${version}") || configVersionRaw.contains("${project.version}")) configVersionRaw = "0.0.0";
 
-        String pluginVersionRaw = DiscordSRV.getPlugin().getDescription().getVersion();
+        String pluginVersionRaw = DiscordSRV.getPlugin().getVersion();
         if (configVersionRaw.equals(pluginVersionRaw)) return;
 
-        Version configVersion = configVersionRaw.split("\\.").length == 3
-                ? Version.valueOf(configVersionRaw.replace("-SNAPSHOT", ""))
-                : Version.valueOf("1." + configVersionRaw.replace("-SNAPSHOT", ""));
-        Version pluginVersion = Version.valueOf(pluginVersionRaw.replace("-SNAPSHOT", ""));
-
-        if (configVersion.equals(pluginVersion)) return; // no migration necessary
-        if (configVersion.greaterThan(pluginVersion)) {
-            DiscordSRV.warning("You're attempting to use a higher config version than the plugin. Things probably won't work correctly.");
+        int comparison = compareVersions(configVersionRaw, pluginVersionRaw);
+        if (comparison == 0) return; // no migration necessary
+        if (comparison > 0) {
+            DiscordSRV.warning("You're attempting to use a higher config version than the mod. Things probably won't work correctly.");
             return;
         }
 
-        String oldVersionName = configVersion.getMajorVersion() == 0 ? "invalidversion" : configVersion.toString();
+        String oldVersionName = configVersionRaw.equals("0.0.0") ? "invalidversion" : configVersionRaw;
         DiscordSRV.info("Your DiscordSRV config file was outdated; attempting migration...");
 
         try {
-            Provider configProvider = DiscordSRV.config().getProvider("config");
-            Provider messageProvider = DiscordSRV.config().getProvider("messages");
-            Provider voiceProvider = DiscordSRV.config().getProvider("voice");
-            Provider linkingProvider = DiscordSRV.config().getProvider("linking");
-            Provider synchronizationProvider = DiscordSRV.config().getProvider("synchronization");
-            Provider alertsProvider = DiscordSRV.config().getProvider("alerts");
+            DynamicConfig.Source configProvider = DiscordSRV.config().getProvider("config");
+            DynamicConfig.Source messageProvider = DiscordSRV.config().getProvider("messages");
+            DynamicConfig.Source voiceProvider = DiscordSRV.config().getProvider("voice");
+            DynamicConfig.Source linkingProvider = DiscordSRV.config().getProvider("linking");
+            DynamicConfig.Source synchronizationProvider = DiscordSRV.config().getProvider("synchronization");
+            DynamicConfig.Source alertsProvider = DiscordSRV.config().getProvider("alerts");
 
             migrate("config.yml-build." + oldVersionName + ".old", DiscordSRV.getPlugin().getConfigFile(), configProvider);
             migrate("messages.yml-build." + oldVersionName + ".old", DiscordSRV.getPlugin().getMessagesFile(), messageProvider);
@@ -80,14 +74,19 @@ public class ConfigUtil {
         }
     }
 
-    private static void migrate(String fromFileName, File to, Provider provider) throws IOException, ParseException {
+    private static void migrate(String fromFileName, File to, DynamicConfig.Source provider) throws IOException {
         File from = new File(DiscordSRV.getPlugin().getDataFolder(), fromFileName);
         if (from.exists()) from = new File(DiscordSRV.getPlugin().getDataFolder(), fromFileName + "-" + System.currentTimeMillis());
-        FileUtils.moveFile(to, from);
+        if (!to.exists()) {
+            provider.saveDefaults();
+            provider.load();
+            return;
+        }
+        Files.move(to.toPath(), from.toPath(), StandardCopyOption.REPLACE_EXISTING);
         provider.saveDefaults();
 
-        List<String> oldConfigLines = Arrays.stream(FileUtils.readFileToString(from, StandardCharsets.UTF_8).split(System.lineSeparator() + "|\n")).collect(Collectors.toList());
-        List<String> newConfigLines = Arrays.stream(FileUtils.readFileToString(to, StandardCharsets.UTF_8).split(System.lineSeparator() + "|\n")).collect(Collectors.toList());
+        List<String> oldConfigLines = Arrays.stream(new String(Files.readAllBytes(from.toPath()), StandardCharsets.UTF_8).split(System.lineSeparator() + "|\n")).collect(Collectors.toList());
+        List<String> newConfigLines = Arrays.stream(new String(Files.readAllBytes(to.toPath()), StandardCharsets.UTF_8).split(System.lineSeparator() + "|\n")).collect(Collectors.toList());
 
         Map<String, String> options = new HashMap<>();
 
@@ -170,19 +169,19 @@ public class ConfigUtil {
         if (option != null) newConfig.append(option).append(": ").append(options.get(option));
         newConfig.append(comments);
 
-        FileUtils.writeStringToFile(to, newConfig.toString(), StandardCharsets.UTF_8);
+        Files.write(to.toPath(), newConfig.toString().getBytes(StandardCharsets.UTF_8));
 
         provider.load();
     }
 
     public static void logMissingOptions() {
-        for (Map.Entry<Source, Provider> entry : DiscordSRV.config().getSources().entrySet()) {
+        for (DynamicConfig.Source source : DiscordSRV.config().getSources().values()) {
             Set<String> keys;
             try {
-                keys = getAllKeys(entry.getValue().getDefaults().asMap());
-                keys.removeAll(getAllKeys(entry.getValue().getValues().asMap()));
+                keys = getAllKeys(source.getDefaults());
+                keys.removeAll(getAllKeys(source.getValues()));
             } catch (Throwable t) {
-                DiscordSRV.error("Failed to check " + entry.getKey().getResourceName() + " for missing options, is it broken?", t);
+                DiscordSRV.error("Failed to check " + source.getResourceName() + " for missing options, is it broken?", t);
                 continue;
             }
 
@@ -190,9 +189,30 @@ public class ConfigUtil {
                 // ignore map entries
                 if (missing.contains(".")) continue;
 
-                DiscordSRV.warning("Config key " + missing + " is missing from the " + entry.getKey().getResourceName() + ".yml. Using the default value of " + entry.getValue().getDefaults().dget(missing).asObject());
+                DiscordSRV.warning("Config key " + missing + " is missing from the " + source.getResourceName() + ".yml. Using the default value of " + source.getDefaults().get(missing));
             }
         }
+    }
+
+    /**
+     * Compares two dotted version strings (eg. 1.30.5 and 1.30.5-neoforge.2), ignoring -SNAPSHOT suffixes
+     * @return a negative number, zero, or a positive number as a is less than, equal to, or greater than b
+     */
+    public static int compareVersions(String a, String b) {
+        String[] partsA = a.replace("-SNAPSHOT", "").split("[.+-]");
+        String[] partsB = b.replace("-SNAPSHOT", "").split("[.+-]");
+        for (int i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+            String partA = i < partsA.length ? partsA[i] : "0";
+            String partB = i < partsB.length ? partsB[i] : "0";
+            int result;
+            if (partA.matches("\\d+") && partB.matches("\\d+")) {
+                result = Long.compare(Long.parseLong(partA), Long.parseLong(partB));
+            } else {
+                result = partA.compareTo(partB);
+            }
+            if (result != 0) return result;
+        }
+        return 0;
     }
 
     public static Set<String> getAllKeys(Map<String, Object> map) {

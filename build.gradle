@@ -1,0 +1,198 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
+plugins {
+    id 'java-library'
+    id 'idea'
+    id 'net.neoforged.moddev' version '2.0.148'
+    id 'com.gradleup.shadow' version '9.2.2'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = 'DiscordSRV-ReForged'
+}
+
+// Minecraft 1.21.1 ships Java 21
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    runs {
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        client {
+            client()
+        }
+        configureEach {
+            logLevel = org.slf4j.event.Level.INFO
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    // Libraries that are bundled (shaded & relocated) into the final mod jar
+    shade
+    implementation.extendsFrom shade
+    // make the bundled libraries available when running the game from the IDE / gradle runs
+    additionalRuntimeClasspath.extendsFrom shade
+}
+
+// Libraries that Minecraft/NeoForge already provide at runtime. These must never be bundled.
+def providedByMinecraft = { ModuleDependency dep ->
+    dep.exclude group: 'org.slf4j'
+    dep.exclude group: 'com.google.code.gson'
+    dep.exclude group: 'com.google.guava'
+    dep.exclude group: 'org.apache.commons', module: 'commons-lang3'
+    dep.exclude group: 'commons-io'
+    dep.exclude group: 'commons-codec'
+    dep.exclude group: 'org.apache.logging.log4j'
+    dep.exclude group: 'org.jetbrains', module: 'annotations'
+    dep.exclude group: 'io.netty'
+}
+
+dependencies {
+    // Discord API (voice/audio isn't used, so the native opus + encryption libraries are left out)
+    shade("net.dv8tion:JDA:${jda_version}") {
+        providedByMinecraft(it)
+        exclude module: 'opus-java'
+        exclude group: 'com.google.crypto.tink'
+    }
+
+    // Text components / formatting
+    shade("net.kyori:adventure-api:${adventure_version}") { providedByMinecraft(it) }
+    shade("net.kyori:adventure-text-minimessage:${adventure_version}") { providedByMinecraft(it) }
+    shade("net.kyori:adventure-text-serializer-legacy:${adventure_version}") { providedByMinecraft(it) }
+    shade("net.kyori:adventure-text-serializer-plain:${adventure_version}") { providedByMinecraft(it) }
+    shade("net.kyori:adventure-text-serializer-gson:${adventure_version}") { providedByMinecraft(it) }
+    shade("dev.vankka:mcdiscordreserializer:${mcdiscordreserializer_version}") { providedByMinecraft(it) }
+
+    // Config
+    shade("org.yaml:snakeyaml:${snakeyaml_version}")
+    shade("com.github.alexheretic:dynamics:${dynamics_version}")
+    shade("com.hrakaroo:glob:0.9.0")
+
+    // Misc
+    shade("com.vdurmont:emoji-java:${emoji_version}") { providedByMinecraft(it) }
+    shade("org.springframework:spring-expression:${spring_expression_version}") {
+        providedByMinecraft(it)
+        exclude module: 'spring-jcl'
+    }
+    shade("com.mysql:mysql-connector-j:${mysql_connector_version}") {
+        providedByMinecraft(it)
+        exclude group: 'com.google.protobuf' // only used by the X DevAPI
+    }
+    // spring-core logs through commons-logging; route it to slf4j (which Minecraft provides)
+    shade('org.slf4j:jcl-over-slf4j:2.0.9') { transitive = false }
+
+    // Optional integrations
+    compileOnly("net.luckperms:api:${luckperms_api_version}")
+
+    compileOnly("org.projectlombok:lombok:${lombok_version}")
+    annotationProcessor("org.projectlombok:lombok:${lombok_version}")
+    compileOnly('org.jetbrains:annotations:24.1.0')
+
+    testImplementation('org.junit.jupiter:junit-jupiter:5.11.4')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher')
+    testCompileOnly("org.projectlombok:lombok:${lombok_version}")
+    testAnnotationProcessor("org.projectlombok:lombok:${lombok_version}")
+}
+
+def modProperties = [
+        minecraft_version      : minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        neo_version            : neo_version,
+        loader_version_range   : loader_version_range,
+        mod_id                 : mod_id,
+        mod_name               : mod_name,
+        mod_license            : mod_license,
+        mod_version            : mod_version,
+        mod_authors            : mod_authors,
+        mod_description        : mod_description,
+        version                : mod_version,
+]
+
+processResources {
+    inputs.properties modProperties
+    // Only ${...} tokens that are known get replaced; everything else in the configs is left untouched
+    filesMatching(['META-INF/neoforge.mods.toml', '**/*.yml']) {
+        filter(ReplaceTokens, tokens: modProperties.collectEntries { k, v -> [k, v.toString()] }, beginToken: '${', endToken: '}')
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    // the plain jar does not contain the libraries and can't be used on a server
+    archiveClassifier = 'slim'
+}
+
+shadowJar {
+    archiveClassifier = ''
+    configurations = [project.configurations.shade]
+
+    def prefix = 'github.scarsz.discordsrv.dependencies'
+    [
+            'net.dv8tion.jda'                   : 'jda',
+            'com.neovisionaries.ws'             : 'ws',
+            'okhttp3'                           : 'okhttp3',
+            'okio'                              : 'okio',
+            'kotlin'                            : 'kotlin',
+            'org.intellij.lang.annotations'     : 'intellij.annotations',
+            'org.jetbrains.annotations'         : 'jetbrains.annotations',
+            'gnu.trove'                         : 'trove',
+            'com.fasterxml.jackson'             : 'jackson',
+            'org.apache.commons.collections4'   : 'commons.collections4',
+            'org.apache.commons.logging'        : 'commons.logging',
+            'net.kyori'                         : 'kyori',
+            'dev.vankka.mcdiscordreserializer'  : 'mcdiscordreserializer',
+            'dev.vankka.simpleast'              : 'simpleast',
+            'org.yaml.snakeyaml'                : 'snakeyaml',
+            'com.vdurmont.emoji'                : 'emoji',
+            'org.json'                          : 'json',
+            'org.springframework'               : 'springframework',
+            'com.mysql'                         : 'mysql',
+            'alexh'                             : 'alexh',
+            'com.hrakaroo.glob'                 : 'glob',
+    ].each { from, to -> relocate from, "${prefix}.${to}" }
+
+    mergeServiceFiles()
+
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    exclude 'META-INF/maven/**', 'META-INF/proguard/**', 'META-INF/versions/*/module-info.class'
+    exclude 'module-info.class', '**/module-info.class'
+    exclude 'META-INF/*.kotlin_module', 'META-INF/LICENSE*', 'META-INF/NOTICE*'
+}
+
+assemble.dependsOn shadowJar
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

@@ -24,16 +24,12 @@ import github.scarsz.discordsrv.Debug;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.objects.ExpiringDualHashBidiMap;
 import github.scarsz.discordsrv.objects.managers.link.file.AppendOnlyFileAccountLinkManager;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import github.scarsz.discordsrv.platform.event.PlayerJoinEvent;
+import github.scarsz.discordsrv.platform.event.PlayerQuitEvent;
 import github.scarsz.discordsrv.util.*;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.player.PlayerLoginEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.io.File;
 import java.sql.*;
@@ -194,9 +190,9 @@ public class JdbcAccountLinkManager extends AbstractAccountLinkManager {
 
         DiscordSRV.info("JDBC tables passed validation, using JDBC account backend");
 
-        SchedulerUtil.runTaskTimerAsynchronously(DiscordSRV.getPlugin(), () -> {
+        SchedulerUtil.runTaskTimerAsynchronously(() -> {
             long currentTime = System.currentTimeMillis();
-            for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+            for (GamePlayer onlinePlayer : PlayerUtil.getOnlinePlayers()) {
                 UUID uuid = onlinePlayer.getUniqueId();
                 if (!cache.containsKey(uuid) || cache.getExpiryTime(uuid) - TimeUnit.SECONDS.toMillis(30) < currentTime) {
                     putExpiring(uuid, getDiscordIdBypassCache(uuid), currentTime + EXPIRY_TIME_ONLINE);
@@ -356,10 +352,9 @@ public class JdbcAccountLinkManager extends AbstractAccountLinkManager {
             if (DiscordSRV.config().getBoolean("MinecraftDiscordAccountLinkedAllowRelinkBySendingANewCode")) {
                 unlink(discordId);
             } else {
-                OfflinePlayer offlinePlayer = DiscordSRV.getPlugin().getServer().getOfflinePlayer(existingUuid);
                 return LangUtil.Message.ALREADY_LINKED.toString()
-                        .replace("%username%", String.valueOf(offlinePlayer.getName()))
-                        .replace("%uuid%", offlinePlayer.getUniqueId().toString())
+                        .replace("%username%", String.valueOf(DiscordSRV.getPlatform().getPlayerName(existingUuid)))
+                        .replace("%uuid%", existingUuid.toString())
                         .replace("%mention%", mention);
             }
         }
@@ -378,17 +373,17 @@ public class JdbcAccountLinkManager extends AbstractAccountLinkManager {
                 DiscordSRV.error(e);
             }
 
-            OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-            if (player.isOnline()) {
-                MessageUtil.sendMessage(player.getPlayer(), LangUtil.Message.MINECRAFT_ACCOUNT_LINKED.toString()
+            GamePlayer onlinePlayer = DiscordSRV.getPlatform().getPlayer(uuid);
+            if (onlinePlayer != null) {
+                MessageUtil.sendMessage(onlinePlayer, LangUtil.Message.MINECRAFT_ACCOUNT_LINKED.toString()
                         .replace("%username%", DiscordUtil.getUserById(discordId).getName())
                         .replace("%id%", DiscordUtil.getUserById(discordId).getId())
                 );
             }
 
             return LangUtil.Message.DISCORD_ACCOUNT_LINKED.toString()
-                    .replace("%name%", PrettyUtil.beautifyUsername(player, "<Unknown>", false))
-                    .replace("%displayname%", PrettyUtil.beautifyNickname(player, "<Unknown>", false))
+                    .replace("%name%", PrettyUtil.beautifyUsername(uuid, "<Unknown>", false))
+                    .replace("%displayname%", PrettyUtil.beautifyNickname(uuid, "<Unknown>", false))
                     .replace("%uuid%", uuid.toString())
                     .replace("%mention%", mention);
         }
@@ -627,15 +622,15 @@ public class JdbcAccountLinkManager extends AbstractAccountLinkManager {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onPlayerLogin(PlayerLoginEvent event) {
-        SchedulerUtil.runTaskAsynchronously(DiscordSRV.getPlugin(), () -> {
+    @Override
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        SchedulerUtil.runTaskAsynchronously(() -> {
             UUID uuid = event.getPlayer().getUniqueId();
             cache.putExpiring(uuid, getDiscordIdBypassCache(uuid), System.currentTimeMillis() + EXPIRY_TIME_ONLINE);
         });
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @Override
     public void onPlayerQuit(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
         if (!cache.containsKey(uuid)) return;

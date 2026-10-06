@@ -22,11 +22,10 @@ package github.scarsz.discordsrv.commands;
 
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.util.*;
-import net.dv8tion.jda.api.entities.TextChannel;
+import github.scarsz.discordsrv.platform.CommandSender;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
 
 import java.util.List;
 import java.util.Objects;
@@ -63,7 +62,7 @@ public class CommandBroadcast {
         }
 
         if (finalArgs.length == 0) {
-            MessageUtil.sendMessage(sender, ChatColor.RED + LangUtil.InternalMessage.NO_MESSAGE_GIVEN_TO_BROADCAST.toString());
+            MessageUtil.sendMessage(sender, "§c" + LangUtil.InternalMessage.NO_MESSAGE_GIVEN_TO_BROADCAST.toString());
         } else {
             String rawMessage = String.join(" ", finalArgs).replace("\\n", "\n");
             rawMessage = PlaceholderUtil.replacePlaceholdersToDiscord(rawMessage);

@@ -20,7 +20,7 @@
 
 package github.scarsz.discordsrv.objects.managers;
 
-import org.bukkit.event.Listener;
+import github.scarsz.discordsrv.platform.event.GameListener;
 
 import java.io.IOException;
 import java.util.Map;
@@ -30,7 +30,7 @@ import java.util.UUID;
 /**
  * Class for accessing and managing linked accounts.
  */
-public interface AccountLinkManager extends Listener {
+public interface AccountLinkManager extends GameListener {
 
     /**
      * Gets the Discord ID for a given player's linked account.
@@ -38,7 +38,7 @@ public interface AccountLinkManager extends Listener {
      * @param uuid the player's UUID
      * @return the player's linked account's Discord user id or {@code null}.
      * @see net.dv8tion.jda.api.JDA#getUserById(String)
-     * @throws IllegalStateException if this is requested on Bukkit's main thread for a player that isn't online when DiscordSRV is using a non-memory storage backend (in the future)
+     * @throws IllegalStateException if this is requested on the server's main thread for a player that isn't online when DiscordSRV is using a non-memory storage backend (in the future)
      * @see #isInCache(UUID)
      */
     String getDiscordId(UUID uuid);
@@ -48,7 +48,7 @@ public interface AccountLinkManager extends Listener {
      *
      * @param discordId the Discord user's id.
      * @return the user's linked account's uuid or {@code null}.
-     * @throws IllegalStateException if this is requested on Bukkit's main thread for a player that isn't online when DiscordSRV is using a non-memory storage backend (in the future)
+     * @throws IllegalStateException if this is requested on the server's main thread for a player that isn't online when DiscordSRV is using a non-memory storage backend (in the future)
      * @see #isInCache(String)
      */
     UUID getUuid(String discordId);
@@ -66,7 +66,7 @@ public interface AccountLinkManager extends Listener {
      * @param uuids the set of Minecraft player uuids.
      * @return the map of UUID-Discord id pairs, if a given player isn't linked there will be no entry for that player.
      * @see #getDiscordId(UUID)
-     * @throws IllegalStateException if this is requested on Bukkit's main thread when DiscordSRV is using a non-memory storage backend (in the future)
+     * @throws IllegalStateException if this is requested on the server's main thread when DiscordSRV is using a non-memory storage backend (in the future)
      */
     Map<UUID, String> getManyDiscordIds(Set<UUID> uuids);
 
@@ -76,7 +76,7 @@ public interface AccountLinkManager extends Listener {
      * @param discordIds the set of Discord user ids.
      * @return the map of Discord id-UUID pairs, if a given user isn't linked there will be no entry for that user.
      * @see #getUuid(String)
-     * @throws IllegalStateException if this is requested on Bukkit's main thread when DiscordSRV is using a non-memory storage backend (in the future)
+     * @throws IllegalStateException if this is requested on the server's main thread when DiscordSRV is using a non-memory storage backend (in the future)
      */
     Map<String, UUID> getManyUuids(Set<String> discordIds);
 
@@ -88,7 +88,7 @@ public interface AccountLinkManager extends Listener {
      * @see #getDiscordId(UUID)
      * @see #getManyUuids(Set)
      * @see #getManyDiscordIds(Set)
-     * @throws IllegalStateException if this is requested on Bukkit's main thread when DiscordSRV is using a non-memory storage backend (in the future)
+     * @throws IllegalStateException if this is requested on the server's main thread when DiscordSRV is using a non-memory storage backend (in the future)
      */
     Map<String, UUID> getLinkedAccounts();
 

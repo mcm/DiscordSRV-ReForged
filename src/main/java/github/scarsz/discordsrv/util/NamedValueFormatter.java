@@ -21,7 +21,6 @@
 package github.scarsz.discordsrv.util;
 
 import github.scarsz.discordsrv.DiscordSRV;
-import org.bukkit.Bukkit;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -79,7 +78,7 @@ public abstract class NamedValueFormatter {
     public static String formatExpressions(String format, Object root) {
         return format(format, EXPRESSION_PATTERN, expression -> new SpELExpressionBuilder(expression)
                 .withPluginVariables()
-                .withVariable("server", Bukkit.getServer())
+                .withVariable("server", DiscordSRV.getPlatform())
                 .withVariable("discordsrv", DiscordSRV.getPlugin())
                 .withVariable("jda", DiscordUtil.getJda())
                 .evaluate(root)
@@ -89,7 +88,7 @@ public abstract class NamedValueFormatter {
     public static String formatExpressions(String format, Object root, Map<String, Object> variables) {
         return format(format, EXPRESSION_PATTERN, expression -> new SpELExpressionBuilder(expression)
                 .withPluginVariables()
-                .withVariable("server", Bukkit.getServer())
+                .withVariable("server", DiscordSRV.getPlatform())
                 .withVariable("discordsrv", DiscordSRV.getPlugin())
                 .withVariable("jda", DiscordUtil.getJda())
                 .withVariables(variables)

@@ -21,15 +21,14 @@
 package github.scarsz.discordsrv.api.events;
 
 import github.scarsz.discordsrv.objects.MessageFormat;
-import org.bukkit.entity.Player;
-import org.bukkit.event.Cancellable;
-import org.bukkit.event.Event;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import github.scarsz.discordsrv.api.Cancellable;
 
 /**
  * <p>Called before DiscordSRV has processed a achievement/advancement message, modifications may be overwritten by DiscordSRV's processing.</p>
  */
 @SuppressWarnings({"LombokGetterMayBeUsed", "LombokSetterMayBeUsed"})
-public class AchievementMessagePreProcessEvent extends GameEvent<Event> implements Cancellable {
+public class AchievementMessagePreProcessEvent extends GameEvent<github.scarsz.discordsrv.platform.event.GameEvent> implements Cancellable {
 
     private boolean cancelled;
 
@@ -37,7 +36,7 @@ public class AchievementMessagePreProcessEvent extends GameEvent<Event> implemen
     private String channel;
     private MessageFormat messageFormat;
 
-    public AchievementMessagePreProcessEvent(String channel, MessageFormat messageFormat, Player player, String achievementName, Event triggeringBukkitEvent) {
+    public AchievementMessagePreProcessEvent(String channel, MessageFormat messageFormat, GamePlayer player, String achievementName, github.scarsz.discordsrv.platform.event.GameEvent triggeringBukkitEvent) {
         super(player, triggeringBukkitEvent);
         this.channel = channel;
         this.messageFormat = messageFormat;
@@ -45,7 +44,7 @@ public class AchievementMessagePreProcessEvent extends GameEvent<Event> implemen
     }
 
     @Deprecated
-    public AchievementMessagePreProcessEvent(String channel, MessageFormat messageFormat, Player player, String achievementName) {
+    public AchievementMessagePreProcessEvent(String channel, MessageFormat messageFormat, GamePlayer player, String achievementName) {
         super(player, null);
         this.channel = channel;
         this.messageFormat = messageFormat;
@@ -53,7 +52,7 @@ public class AchievementMessagePreProcessEvent extends GameEvent<Event> implemen
     }
 
     @Deprecated
-    public AchievementMessagePreProcessEvent(String channel, String message, Player player, String achievementName) {
+    public AchievementMessagePreProcessEvent(String channel, String message, GamePlayer player, String achievementName) {
         super(player, null);
         this.channel = channel;
         MessageFormat messageFormat = new MessageFormat();

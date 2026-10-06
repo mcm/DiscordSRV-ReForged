@@ -21,13 +21,14 @@
 package github.scarsz.discordsrv.util;
 
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
 
 import java.util.Arrays;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class PrettyUtil {
@@ -39,51 +40,71 @@ public class PrettyUtil {
     public static String beautify(User user, String noUsernameFormat, boolean includeId) {
         if (user == null) return noUsernameFormat;
 
-        Member member = DiscordSRV.getPlugin().getMainGuild().getMember(user);
+        Guild mainGuild = DiscordSRV.getPlugin().getMainGuild();
+        Member member = mainGuild != null ? mainGuild.getMember(user) : null;
 
         return member != null
                 ? member.getEffectiveName() + (includeId ? " (#" + user.getId() + ")" : "")
                 : user.getName() + (includeId ? " (#" + user.getId() + ")" : "");
     }
 
-    public static String beautifyUsername(OfflinePlayer player) {
+    public static String beautifyUsername(UUID player) {
         return beautifyUsername(player, "<Unknown>", true);
     }
 
-    public static String beautifyUsername(OfflinePlayer player, String noUsernameFormat, boolean includeUuid) {
+    public static String beautifyUsername(UUID player, String noUsernameFormat, boolean includeUuid) {
         if (player == null) return noUsernameFormat;
 
-        String name = player.getName();
-        if (name == null && player.isOnline()) {
+        String name = DiscordSRV.getPlatform().getPlayerName(player);
+        if (name == null) {
             // maybe this will work?
-            Player onlinePlayer = player.getPlayer();
+            GamePlayer onlinePlayer = DiscordSRV.getPlatform().getPlayer(player);
             if (onlinePlayer != null) {
                 name = onlinePlayer.getName();
             }
         }
-        return (name != null ? name : noUsernameFormat) + (includeUuid ? " (" + player.getUniqueId() + ")" : "");
+        return (name != null ? name : noUsernameFormat) + (includeUuid ? " (" + player + ")" : "");
+    }
+
+    public static String beautifyUsername(GamePlayer player) {
+        return beautifyUsername(player, "<Unknown>", true);
+    }
+
+    public static String beautifyUsername(GamePlayer player, String noUsernameFormat, boolean includeUuid) {
+        if (player == null) return noUsernameFormat;
+        return beautifyUsername(player.getUniqueId(), noUsernameFormat, includeUuid);
     }
 
     /**
-     * Turns a {@link OfflinePlayer} into Nickname/Username (UUID)
-     * @param player the offline player
+     * Turns a player uuid into Nickname/Username (UUID)
+     * @param player the player's uuid
      * @return the player's nickname (if online) or username (if offline) and the UUID or if player is null "<Unknown>"
      */
-    public static String beautifyNickname(OfflinePlayer player) {
+    public static String beautifyNickname(UUID player) {
         return beautifyNickname(player, "<Unknown>", true);
     }
 
-    public static String beautifyNickname(OfflinePlayer player, String noUsernameFormat, boolean includeUuid) {
-        if (player == null || player.getName() == null) return noUsernameFormat;
+    public static String beautifyNickname(UUID player, String noUsernameFormat, boolean includeUuid) {
+        if (player == null) return noUsernameFormat;
 
-        if (player.isOnline()) {
-            if (player.getPlayer() == null) return beautifyUsername(player);
-            String displayName = player.getPlayer().getDisplayName();
+        GamePlayer onlinePlayer = DiscordSRV.getPlatform().getPlayer(player);
+        if (onlinePlayer != null) {
+            String displayName = onlinePlayer.getDisplayName();
             if (StringUtils.isBlank(displayName)) return beautifyUsername(player);
-            return MessageUtil.strip(displayName) + (includeUuid ? " (" + player.getUniqueId() + ")" : "");
+            return MessageUtil.strip(displayName) + (includeUuid ? " (" + player + ")" : "");
         } else {
+            if (DiscordSRV.getPlatform().getPlayerName(player) == null) return noUsernameFormat;
             return beautifyUsername(player);
         }
+    }
+
+    public static String beautifyNickname(GamePlayer player) {
+        return beautifyNickname(player, "<Unknown>", true);
+    }
+
+    public static String beautifyNickname(GamePlayer player, String noUsernameFormat, boolean includeUuid) {
+        if (player == null) return noUsernameFormat;
+        return beautifyNickname(player.getUniqueId(), noUsernameFormat, includeUuid);
     }
 
     /**

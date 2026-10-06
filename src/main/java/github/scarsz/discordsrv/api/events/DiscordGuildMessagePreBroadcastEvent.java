@@ -22,7 +22,7 @@ package github.scarsz.discordsrv.api.events;
 
 import net.dv8tion.jda.api.entities.User;
 import net.kyori.adventure.text.Component;
-import org.bukkit.command.CommandSender;
+import github.scarsz.discordsrv.platform.CommandSender;
 
 import java.util.List;
 

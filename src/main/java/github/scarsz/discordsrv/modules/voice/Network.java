@@ -23,9 +23,8 @@ package github.scarsz.discordsrv.modules.voice;
 import github.scarsz.discordsrv.Debug;
 import github.scarsz.discordsrv.DiscordSRV;
 import net.dv8tion.jda.api.Permission;
-import net.dv8tion.jda.api.entities.VoiceChannel;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
+import github.scarsz.discordsrv.platform.GamePlayer;
+import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
 
 import java.util.*;
 
@@ -84,45 +83,45 @@ public class Network {
     /**
      * @return true if the player is within the network strength or falloff ranges
      */
-    public boolean isPlayerInRangeToBeAdded(Player player) {
+    public boolean isPlayerInRangeToBeAdded(GamePlayer player) {
         return players.stream()
-                .map(Bukkit::getPlayer)
+                .map(uuid -> DiscordSRV.getPlatform().getPlayer(uuid))
                 .filter(Objects::nonNull)
-                .filter(p -> !p.equals(player))
-                .filter(p -> p.getWorld().getName().equals(player.getWorld().getName()))
-                .anyMatch(p -> VoiceModule.verticalDistance(p.getLocation(), player.getLocation()) <= VoiceModule.getVerticalStrength()
-                        && VoiceModule.horizontalDistance(p.getLocation(), player.getLocation()) <= VoiceModule.getHorizontalStrength());
+                .filter(p -> !p.getUniqueId().equals(player.getUniqueId()))
+                .filter(p -> p.getWorldName().equals(player.getWorldName()))
+                .anyMatch(p -> VoiceModule.verticalDistance(p, player) <= VoiceModule.getVerticalStrength()
+                        && VoiceModule.horizontalDistance(p, player) <= VoiceModule.getHorizontalStrength());
     }
 
     /**
      * @return true if the player is within the network strength and should be connected
      */
-    public boolean isPlayerInRangeToStayConnected(Player player) {
+    public boolean isPlayerInRangeToStayConnected(GamePlayer player) {
         double falloff = VoiceModule.getFalloff();
         return players.stream()
-                .map(Bukkit::getPlayer)
+                .map(uuid -> DiscordSRV.getPlatform().getPlayer(uuid))
                 .filter(Objects::nonNull)
-                .filter(p -> !p.equals(player))
-                .filter(p -> p.getWorld().getName().equals(player.getWorld().getName()))
-                .anyMatch(p -> VoiceModule.verticalDistance(p.getLocation(), player.getLocation()) <= VoiceModule.getVerticalStrength() + falloff
-                        && VoiceModule.horizontalDistance(p.getLocation(), player.getLocation()) <= VoiceModule.getHorizontalStrength() + falloff);
+                .filter(p -> !p.getUniqueId().equals(player.getUniqueId()))
+                .filter(p -> p.getWorldName().equals(player.getWorldName()))
+                .anyMatch(p -> VoiceModule.verticalDistance(p, player) <= VoiceModule.getVerticalStrength() + falloff
+                        && VoiceModule.horizontalDistance(p, player) <= VoiceModule.getHorizontalStrength() + falloff);
     }
 
     /**
      * @return true if the player is within the falloff range <strong>but not the strength range</strong>
      */
-    public boolean isPlayerInsideFalloffZone(Player player) {
+    public boolean isPlayerInsideFalloffZone(GamePlayer player) {
         double falloff = VoiceModule.getFalloff();
         double horizontalStrength = VoiceModule.getHorizontalStrength();
         double verticalStrength = VoiceModule.getHorizontalStrength();
         return players.stream()
-                .map(Bukkit::getPlayer)
+                .map(uuid -> DiscordSRV.getPlatform().getPlayer(uuid))
                 .filter(Objects::nonNull)
-                .filter(p -> !p.equals(player))
-                .filter(p -> p.getWorld().getName().equals(player.getWorld().getName()))
+                .filter(p -> !p.getUniqueId().equals(player.getUniqueId()))
+                .filter(p -> p.getWorldName().equals(player.getWorldName()))
                 .anyMatch(p -> {
-                    double vertical = VoiceModule.verticalDistance(p.getLocation(), player.getLocation());
-                    double horizontal = VoiceModule.horizontalDistance(p.getLocation(), player.getLocation());
+                    double vertical = VoiceModule.verticalDistance(p, player);
+                    double horizontal = VoiceModule.horizontalDistance(p, player);
                     return vertical > verticalStrength && vertical <= verticalStrength + falloff
                             && horizontal > horizontal && horizontal <= horizontalStrength + falloff;
                 });
@@ -132,7 +131,7 @@ public class Network {
         players.clear();
     }
 
-    public void add(Player player) {
+    public void add(GamePlayer player) {
         players.add(player.getUniqueId());
     }
 
@@ -140,7 +139,7 @@ public class Network {
         players.add(uuid);
     }
 
-    public void remove(Player player) {
+    public void remove(GamePlayer player) {
         players.remove(player.getUniqueId());
     }
 
@@ -148,7 +147,7 @@ public class Network {
         players.remove(uuid);
     }
 
-    public boolean contains(Player player) {
+    public boolean contains(GamePlayer player) {
         return players.contains(player.getUniqueId());
     }
 

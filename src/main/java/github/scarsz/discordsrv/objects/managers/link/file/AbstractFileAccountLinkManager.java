@@ -23,14 +23,13 @@ package github.scarsz.discordsrv.objects.managers.link.file;
 import github.scarsz.discordsrv.Debug;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.objects.managers.link.AbstractAccountLinkManager;
+import github.scarsz.discordsrv.platform.GamePlayer;
 import github.scarsz.discordsrv.util.DiscordUtil;
 import github.scarsz.discordsrv.util.LangUtil;
 import github.scarsz.discordsrv.util.MessageUtil;
 import github.scarsz.discordsrv.util.PrettyUtil;
 import net.dv8tion.jda.api.entities.User;
 import org.apache.commons.collections4.bidimap.DualHashBidiMap;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 
 import java.io.File;
 import java.io.IOException;
@@ -102,9 +101,8 @@ public abstract class AbstractFileAccountLinkManager extends AbstractAccountLink
                 synchronized (linkedAccounts) {
                     uuid = linkedAccounts.get(discordId);
                 }
-                OfflinePlayer offlinePlayer = DiscordSRV.getPlugin().getServer().getOfflinePlayer(uuid);
                 return LangUtil.Message.ALREADY_LINKED.toString()
-                        .replace("%username%", PrettyUtil.beautifyUsername(offlinePlayer, "<Unknown>", false))
+                        .replace("%username%", PrettyUtil.beautifyUsername(uuid, "<Unknown>", false))
                         .replace("%uuid%", uuid.toString())
                         .replace("%mention%", mention);
             }
@@ -117,9 +115,10 @@ public abstract class AbstractFileAccountLinkManager extends AbstractAccountLink
             link(discordId, linkingCodes.get(linkCode));
             linkingCodes.remove(linkCode);
 
-            OfflinePlayer player = Bukkit.getOfflinePlayer(getUuid(discordId));
-            if (player.isOnline()) {
-                MessageUtil.sendMessage(Bukkit.getPlayer(getUuid(discordId)), LangUtil.Message.MINECRAFT_ACCOUNT_LINKED.toString()
+            UUID player = getUuid(discordId);
+            GamePlayer onlinePlayer = DiscordSRV.getPlatform().getPlayer(player);
+            if (onlinePlayer != null) {
+                MessageUtil.sendMessage(onlinePlayer, LangUtil.Message.MINECRAFT_ACCOUNT_LINKED.toString()
                         .replace("%username%", user == null ? "" : user.getName())
                         .replace("%id%", user == null ? "" : user.getId())
                 );

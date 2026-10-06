@@ -20,7 +20,7 @@
 
 package github.scarsz.discordsrv.util;
 
-import github.scarsz.configuralize.Language;
+import github.scarsz.discordsrv.config.Language;
 import github.scarsz.discordsrv.DiscordSRV;
 import lombok.Getter;
 

@@ -20,24 +20,35 @@
 
 package github.scarsz.discordsrv.api.events;
 
-import org.bukkit.entity.Player;
+import github.scarsz.discordsrv.platform.GamePlayer;
 
 @SuppressWarnings("LombokGetterMayBeUsed")
-abstract class GameEvent<T extends org.bukkit.event.Event> extends Event {
+abstract class GameEvent<T extends github.scarsz.discordsrv.platform.event.GameEvent> extends Event {
 
-    final private Player player;
-    final private T triggeringBukkitEvent;
+    final private GamePlayer player;
+    final private T triggeringGameEvent;
 
-    GameEvent(Player player, T triggeringBukkitEvent) {
+    GameEvent(GamePlayer player, T triggeringGameEvent) {
         this.player = player;
-        this.triggeringBukkitEvent = triggeringBukkitEvent;
+        this.triggeringGameEvent = triggeringGameEvent;
     }
 
-    public Player getPlayer() {
+    public GamePlayer getPlayer() {
         return this.player;
     }
 
+    /**
+     * @return the game event that triggered this event, may be null
+     */
+    public T getTriggeringGameEvent() {
+        return this.triggeringGameEvent;
+    }
+
+    /**
+     * @deprecated there are no Bukkit events on NeoForge, use {@link #getTriggeringGameEvent()}
+     */
+    @Deprecated
     public T getTriggeringBukkitEvent() {
-        return this.triggeringBukkitEvent;
+        return this.triggeringGameEvent;
     }
 }

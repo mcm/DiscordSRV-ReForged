@@ -23,8 +23,8 @@ package github.scarsz.discordsrv.api.events;
 import github.scarsz.discordsrv.objects.managers.AccountLinkManager;
 import java.util.UUID;
 import net.dv8tion.jda.api.entities.User;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
+import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.platform.GamePlayer;
 
 /**
  * <p>Called directly after an account pair is linked via DiscordSRV's {@link AccountLinkManager}</p>
@@ -32,16 +32,33 @@ import org.bukkit.OfflinePlayer;
 @SuppressWarnings("LombokGetterMayBeUsed")
 public class AccountLinkedEvent extends Event {
 
-    private final OfflinePlayer player;
+    private final UUID playerUuid;
     private final User user;
 
     public AccountLinkedEvent(User user, UUID playerUuid) {
-        this.player = Bukkit.getOfflinePlayer(playerUuid);
+        this.playerUuid = playerUuid;
         this.user = user;
     }
 
-    public OfflinePlayer getPlayer() {
-        return this.player;
+    /**
+     * @return the uuid of the Minecraft player
+     */
+    public UUID getPlayerUuid() {
+        return this.playerUuid;
+    }
+
+    /**
+     * @return the Minecraft player if they're online, otherwise null
+     */
+    public GamePlayer getPlayer() {
+        return DiscordSRV.getPlatform().getPlayer(playerUuid);
+    }
+
+    /**
+     * @return the name of the Minecraft player, or null if unknown
+     */
+    public String getPlayerName() {
+        return DiscordSRV.getPlatform().getPlayerName(playerUuid);
     }
 
     public User getUser() {

@@ -20,10 +20,11 @@
 
 package github.scarsz.discordsrv.commands;
 
-import github.scarsz.configuralize.Language;
-import github.scarsz.configuralize.Provider;
-import github.scarsz.configuralize.Source;
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.config.DynamicConfig;
+import github.scarsz.discordsrv.config.Language;
+import github.scarsz.discordsrv.platform.CommandSender;
+import github.scarsz.discordsrv.platform.GamePlayer;
 import github.scarsz.discordsrv.util.MessageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
@@ -32,14 +33,10 @@ import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class CommandLanguage {
@@ -64,7 +61,7 @@ public class CommandLanguage {
             }
         }
         if (targetLanguage == null) {
-            MessageUtil.sendMessage(sender, ChatColor.DARK_AQUA + "DiscordSRV is currently in " + currentLanguageName + ". " +
+            MessageUtil.sendMessage(sender, "§3" + "DiscordSRV is currently in " + currentLanguageName + ". " +
                     "Change it by giving a language as an argument.");
             return;
         }
@@ -75,7 +72,7 @@ public class CommandLanguage {
                     .filter(DiscordSRV.config()::isLanguageAvailable)
                     .map(language -> StringUtils.capitalize(language.getName().toLowerCase()))
                     .collect(Collectors.joining(", "));
-            MessageUtil.sendMessage(sender, ChatColor.DARK_AQUA + "DiscordSRV does not have a translation for " + targetLanguageName + ". " +
+            MessageUtil.sendMessage(sender, "§3" + "DiscordSRV does not have a translation for " + targetLanguageName + ". " +
                     "Supported languages are as follows: " + available + ".");
             return;
         }
@@ -86,7 +83,7 @@ public class CommandLanguage {
                     .append(Component.text(". Your old config files will be renamed to have ", NamedTextColor.DARK_AQUA))
                     .append(Component.text(currentLanguageName + ".", NamedTextColor.WHITE))
                     .append(Component.text(" on the beginning of the file name. "))
-                    .append(Component.text("[Confirm" + (sender instanceof Player ? "?" : " by running the command again, adding \" -confirm\" to the end") + "]")
+                    .append(Component.text("[Confirm" + (sender instanceof GamePlayer ? "?" : " by running the command again, adding \" -confirm\" to the end") + "]")
                             .color(NamedTextColor.GREEN)
                             .clickEvent(ClickEvent.runCommand("/discord language " + targetLanguage.getCode() + " -confirm"))
                             .hoverEvent(HoverEvent.showText(Component.text("Click to confirm the config change.", NamedTextColor.GREEN)))
@@ -95,22 +92,24 @@ public class CommandLanguage {
         } else {
             DiscordSRV.config().setLanguage(targetLanguage);
 
-            for (Map.Entry<Source, Provider> entry : DiscordSRV.config().getSources().entrySet()) {
-                File source = entry.getKey().getFile();
+            for (DynamicConfig.Source configSource : DiscordSRV.config().getSources().values()) {
+                File source = configSource.getFile();
                 File target = new File(source.getParentFile(), currentLanguageName + "." + source.getName());
                 FileUtils.moveFile(source, target);
 
-                entry.getValue().saveDefaults();
+                configSource.saveDefaults();
 
                 // set the ForcedLanguage value to the new language so language change will be persistent
-                if (entry.getKey().getResourceName().equals("config")) {
+                if (configSource.getResourceName().equals("config")) {
                     String file = FileUtils.readFileToString(source, "UTF-8");
                     file = file.replace("\nForcedLanguage: none", "\nForcedLanguage: " + targetLanguageName);
                     FileUtils.writeStringToFile(source, file, "UTF-8");
                 }
             }
 
-            MessageUtil.sendMessage(sender, ChatColor.DARK_AQUA + "DiscordSRV language successfully changed to " + targetLanguageName + ".");
+            DiscordSRV.config().loadAll();
+
+            MessageUtil.sendMessage(sender, "§3" + "DiscordSRV language successfully changed to " + targetLanguageName + ".");
         }
     }
 

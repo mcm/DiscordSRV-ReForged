@@ -28,9 +28,9 @@ import dev.vankka.simpleast.core.node.Node;
 import dev.vankka.simpleast.core.parser.Rule;
 import dev.vankka.simpleast.core.simple.SimpleMarkdownRules;
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.platform.CommandSender;
 import github.scarsz.discordsrv.objects.DiscordSRVMinecraftRenderer;
 import net.kyori.adventure.audience.Audience;
-import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -38,9 +38,6 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Material;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -106,8 +103,6 @@ public class MessageUtil {
      */
     public static final MinecraftSerializer LIMITED_MINECRAFT_SERIALIZER;
 
-    private static BukkitAudiences BUKKIT_AUDIENCES;
-    private static final boolean MC_1_16;
 
     static {
         // add escape + mention + text rules
@@ -122,19 +117,6 @@ public class MessageUtil {
 
         MINECRAFT_SERIALIZER = new MinecraftSerializer(options, escapeOptions);
         LIMITED_MINECRAFT_SERIALIZER = new MinecraftSerializer(options.withRules(rules), escapeOptions);
-
-        boolean available = false;
-        try {
-            Material.valueOf("NETHERITE_PICKAXE").getKey();
-            available = true;
-        } catch (Throwable ignored) {}
-
-        MC_1_16 = available;
-    }
-
-    private static BukkitAudiences getAudiences() {
-        return (BUKKIT_AUDIENCES != null ? BUKKIT_AUDIENCES :
-                (BUKKIT_AUDIENCES = BukkitAudiences.create(DiscordSRV.getPlugin())));
     }
 
     private MessageUtil() {}
@@ -234,11 +216,6 @@ public class MessageUtil {
      * @return the converted legacy message
      */
     public static String toLegacy(Component component) {
-        if (!MC_1_16 && !PluginUtil.checkIfPluginEnabled("ViaVersion")) {
-            // not 1.16 or using ViaVersion, downsample rgb to the 16 colors
-            GsonComponentSerializer serializer = GsonComponentSerializer.colorDownsamplingGson();
-            component = serializer.deserialize(serializer.serialize(component));
-        }
         return LEGACY_SERIALIZER.serialize(component);
     }
 
@@ -330,38 +307,12 @@ public class MessageUtil {
      * @param adventureMessage the message to send
      */
     public static void sendMessage(Iterable<? extends CommandSender> commandSenders, Component adventureMessage) {
-        Set<Audience> audiences = new HashSet<>();
-        Set<Audience> degradedAudiences = new HashSet<>();
-        commandSenders.forEach(sender -> {
-            Audience audience = getAudiences().sender(sender);
-            if (sender instanceof Player && DiscordSRV.getPlugin().getIncompatibleClientManager().isIncompatible((Player) sender)) {
-                degradedAudiences.add(audience);
-            } else {
-                audiences.add(audience);
+        for (CommandSender sender : commandSenders) {
+            try {
+                sender.sendMessage(adventureMessage);
+            } catch (Throwable t) {
+                DiscordSRV.error(t);
             }
-        });
-
-        try {
-            if (!audiences.isEmpty()) {
-                Audience.audience(audiences).sendMessage(adventureMessage);
-            }
-
-            if (!degradedAudiences.isEmpty()) {
-                // Put it through legacy serializer for degraded audiences
-                Component degraded = LEGACY_SERIALIZER.deserialize(LEGACY_SERIALIZER.serialize(adventureMessage));
-                Audience.audience(degradedAudiences).sendMessage(degraded);
-            }
-        } catch (NoClassDefFoundError e) {
-            // might happen with 1.7
-            if (e.getMessage().equals("org/bukkit/command/ProxiedCommandSender")) {
-                String legacy = toLegacy(adventureMessage);
-                commandSenders.forEach(sender -> sender.sendMessage(legacy));
-                DiscordSRV.debug(e);
-                return;
-            }
-            DiscordSRV.error(e);
-        } catch (Throwable t) {
-            DiscordSRV.error(t);
         }
     }
 

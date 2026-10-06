@@ -28,13 +28,9 @@ import github.scarsz.discordsrv.util.SchedulerUtil;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
+import github.scarsz.discordsrv.platform.CommandSender;
+import github.scarsz.discordsrv.platform.GamePlayer;
 
-import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -46,17 +42,17 @@ public class CommandUnlink {
             permission = "discordsrv.unlink"
     )
     public static void execute(CommandSender sender, String[] args) {
-        SchedulerUtil.runTaskAsynchronously(DiscordSRV.getPlugin(), () -> executeAsync(sender, args));
+        SchedulerUtil.runTaskAsynchronously(() -> executeAsync(sender, args));
     }
 
     private static void executeAsync(CommandSender sender, String[] args) {
         if (args.length == 0) {
-            if (!(sender instanceof Player)) {
-                MessageUtil.sendMessage(sender, ChatColor.RED + LangUtil.InternalMessage.NO_UNLINK_TARGET_SPECIFIED.toString());
+            if (!(sender instanceof GamePlayer)) {
+                MessageUtil.sendMessage(sender, "§c" + LangUtil.InternalMessage.NO_UNLINK_TARGET_SPECIFIED.toString());
                 return;
             }
 
-            Player player = (Player) sender;
+            GamePlayer player = (GamePlayer) sender;
             String linkedId = DiscordSRV.getPlugin().getAccountLinkManager().getDiscordId(player.getUniqueId());
             boolean hasLinkedAccount = linkedId != null;
 
@@ -81,9 +77,9 @@ public class CommandUnlink {
             if (target.length() == 32 || target.length() == 36 && args.length == 1) {
                 // target is UUID
                 CommandLinked.notifyInterpret(sender, "UUID");
-                OfflinePlayer player = Bukkit.getOfflinePlayer(UUID.fromString(target));
+                UUID player = CommandLinked.parseUuid(target);
                 CommandLinked.notifyPlayer(sender, player);
-                String discordId = DiscordSRV.getPlugin().getAccountLinkManager().getDiscordId(player.getUniqueId());
+                String discordId = player != null ? DiscordSRV.getPlugin().getAccountLinkManager().getDiscordId(player) : null;
                 CommandLinked.notifyDiscord(sender, discordId);
                 if (discordId != null) {
                     DiscordSRV.getPlugin().getAccountLinkManager().unlink(discordId);
@@ -95,7 +91,7 @@ public class CommandUnlink {
                 // target is a Discord ID
                 CommandLinked.notifyInterpret(sender, "Discord ID");
                 UUID uuid = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(target);
-                CommandLinked.notifyPlayer(sender, uuid != null ? Bukkit.getOfflinePlayer(uuid) : null);
+                CommandLinked.notifyPlayer(sender, uuid);
                 CommandLinked.notifyDiscord(sender, target);
                 if (uuid != null) {
                     DiscordSRV.getPlugin().getAccountLinkManager().unlink(uuid);
@@ -105,18 +101,15 @@ public class CommandUnlink {
             } else {
                 if (args.length == 1 && target.length() >= 3 && target.length() <= 16) {
                     // target is probably a Minecraft player name
-                    OfflinePlayer player = Arrays.stream(Bukkit.getOfflinePlayers())
-                            .filter(OfflinePlayer::hasPlayedBefore)
-                            .filter(p -> p.getName() != null && p.getName().equalsIgnoreCase(target))
-                            .findFirst().orElse(null);
+                    UUID player = CommandLinked.findPlayer(target);
 
                     if (player != null) {
                         // found them
                         CommandLinked.notifyInterpret(sender, "Minecraft player");
                         CommandLinked.notifyPlayer(sender, player);
-                        CommandLinked.notifyDiscord(sender, DiscordSRV.getPlugin().getAccountLinkManager().getDiscordId(player.getUniqueId()));
+                        CommandLinked.notifyDiscord(sender, DiscordSRV.getPlugin().getAccountLinkManager().getDiscordId(player));
 
-                        DiscordSRV.getPlugin().getAccountLinkManager().unlink(player.getUniqueId());
+                        DiscordSRV.getPlugin().getAccountLinkManager().unlink(player);
                         notifyUnlinked(sender);
                         return;
                     }
@@ -124,13 +117,12 @@ public class CommandUnlink {
 
                 if (joinedTarget.contains("#") || (joinedTarget.length() >= 2 && joinedTarget.length() <= 32 + 5)) {
                     // target is a discord name... probably.
+                    // Discord no longer has discriminators, anything after a # is ignored
                     String targetUsername = joinedTarget.contains("#") ? joinedTarget.split("#")[0] : joinedTarget;
-                    String discriminator = joinedTarget.contains("#") ? joinedTarget.split("#")[1] : "";
 
                     Set<User> matches = DiscordSRV.getPlugin().getMainGuild().getMembers().stream()
                             .filter(member -> member.getUser().getName().equalsIgnoreCase(targetUsername)
                                     || (member.getNickname() != null && member.getNickname().equalsIgnoreCase(targetUsername)))
-                            .filter(member -> member.getUser().getDiscriminator().contains(discriminator))
                             .map(Member::getUser)
                             .collect(Collectors.toSet());
 
@@ -142,7 +134,7 @@ public class CommandUnlink {
                             CommandLinked.notifyDiscord(sender, user.getId());
                             UUID uuid = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(user.getId());
                             if (uuid != null) {
-                                CommandLinked.notifyPlayer(sender, Bukkit.getOfflinePlayer(uuid));
+                                CommandLinked.notifyPlayer(sender, uuid);
                                 DiscordSRV.getPlugin().getAccountLinkManager().unlink(user.getId());
                                 notifyUnlinked(sender);
                             } else {
@@ -151,19 +143,19 @@ public class CommandUnlink {
                         } else {
                             matches.stream().limit(5).forEach(user -> {
                                 UUID uuid = DiscordSRV.getPlugin().getAccountLinkManager().getUuid(user.getId());
-                                CommandLinked.notifyPlayer(sender, uuid != null ? Bukkit.getOfflinePlayer(uuid) : null);
+                                CommandLinked.notifyPlayer(sender, uuid);
                                 CommandLinked.notifyDiscord(sender, user.getId());
                             });
 
                             int remaining = matches.size() - 5;
                             if (remaining >= 1) {
                                 MessageUtil.sendMessage(sender, String.format("%s+%s%d%s more result%s...",
-                                        ChatColor.AQUA, ChatColor.WHITE, remaining, ChatColor.AQUA,
+                                        "§b", "§f", remaining, "§b",
                                         remaining > 1 ? "s" : "")
                                 );
                             }
 
-                            MessageUtil.sendMessage(sender, ChatColor.AQUA + "Be more specific.");
+                            MessageUtil.sendMessage(sender, "§bBe more specific.");
                         }
                         return;
                     }
@@ -176,7 +168,7 @@ public class CommandUnlink {
     }
 
     private static void notifyUnlinked(CommandSender sender) {
-        MessageUtil.sendMessage(sender, ChatColor.WHITE + "- " + ChatColor.AQUA + " Unlinked ✓");
+        MessageUtil.sendMessage(sender, "§f- §b Unlinked ✓");
     }
 
 }

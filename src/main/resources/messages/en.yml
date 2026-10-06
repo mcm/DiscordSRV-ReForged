@@ -71,56 +71,18 @@ DiscordToMinecraftMessageReplyFormat: " (replying to %name%)"
 #                  example: BigBossManJeb
 # %message%:      message content
 #                  example: Hello!
-# %primarygroup%: the name of the user's primary group
-# %world%:        name of world player is in
-#                  example: world
-# %worldalias%:   alias of world player is in via Multiverse-Core
-#                  example: Mainland
+# %primarygroup%: the name of the user's primary group (requires LuckPerms)
+# %world%:        name of the dimension the player is in
+#                  example: overworld
+# %worldalias%:   same as %world%
 # %date%:         current date & time
 #                  example: Sun Jan 1 15:30:45 PDT 2017
 # %channelname%:  the name of the channel that the message was sent in, if the message was sent in a channel at all
 #                  example: Global
-# PlaceholderAPI placeholders are also supported
+# Built-in placeholders (see the README) are also supported
 #
 MinecraftChatToDiscordMessageFormat: "**%primarygroup%** %displayname% » %message%"
 MinecraftChatToDiscordMessageFormatNoPrimaryGroup: "%displayname% » %message%"
-
-# Chat channel plugin message
-# This is a special message that's only used when a supported chat channel plugin is hooked
-# It modifies what the message would be like in-game to include information related to the channel the message is from
-#
-# Available placeholders:
-# %channelcolor%:    the color character corresponding to the channel
-#                     example: messages from the channel are in red, this would replace with the red color
-# %channelname%:     the literal name of the channel, usually the name only the server sees internally
-#                     example: staff
-# %channelnickname%: the formal nickname of the channel, usually the name of the channel that players see
-#                     example: Staff
-# %message%:         the message after processing through DiscordToMinecraftChatMessageFormat / DiscordToMinecraftChatMessageFormatNoRole
-#                     example: jeb_ > Hello from the server!
-#
-ChatChannelHookMessageFormat: "%channelcolor%[%channelnickname%]&r %message%"
-
-# Dynmap messages
-#
-# DynmapNameFormat: the format for the username part of the message sent to Dynmap (this may be hidden depending on dynmap settings)
-# DynmapChatFormat: the format for the message part of the message sent to Dynmap
-#
-# Available placeholders:
-# Same as Discord -> Minecraft placeholders
-#
-# DynmapDiscordFormat: the format for Dynmap messages going to Discord
-#
-# Available placeholders:
-# %message%:  message content
-#              example: Hello!
-# %name%:     the username for the message sent on the Dynmap web chat (could be blank)
-#              example: Notch
-# PlaceholderAPI placeholders are also supported
-#
-DynmapNameFormat: "[Discord | %toprolealias%] %username%"
-DynmapChatFormat: "%message%"
-DynmapDiscordFormat: "[Dynmap] %name% » %message%"
 
 # Discord console channel message
 # This is the format used when sending a line from the console to the console channel, if enabled
@@ -132,7 +94,7 @@ DynmapDiscordFormat: "[Dynmap] %name% » %message%"
 #              example: Server
 # {datetime}: current date & time
 #              example: Sun Jan 1 15:30:45 PDT 2017
-# PlaceholderAPI placeholders are also supported
+# Built-in placeholders (see the README) are also supported
 #
 # DiscordConsoleChannelTimestampFormat: The date format that will be used for the {date} and {datetime} placeholders
 # DiscordConsoleChannelPrefix: The prefix to prepend
@@ -164,10 +126,10 @@ DiscordChatChannelConsoleCommandNotifyErrorsFormat: "**%user%**, you tried runni
 #   Available placeholders:
 #   %username%:     raw player username
 #   %displayname%:  display name from things like nicknames
-#   %primarygroup%: the name of the user's primary group
-#   %world%:        name of world player is in
-#   %worldalias%:   alias of world player is in via Multiverse-Core
-#   PlaceholderAPI placeholders are also supported
+#   %primarygroup%: the name of the user's primary group (requires LuckPerms)
+#   %world%:        name of the dimension the player is in
+#   %worldalias%:   same as %world%
+#   Built-in placeholders (see the README) are also supported
 # DiscordChatChannelListCommandAllPlayersSeparator: the separator used in between players
 #
 DiscordChatChannelListCommandFormatOnlinePlayers: "**Online players (%playercount%):**"
@@ -192,7 +154,7 @@ DiscordChatChannelListCommandAllPlayersSeparator: ", "
 # %embedavatarurl%:      the user's avatar
 # %botavatarurl%:        the bot's avatar
 # %botname%:             the bot's name
-# PlaceholderAPI placeholders are also supported
+# Built-in placeholders (see the README) are also supported
 #
 # Available placeholders for PlayerJoin messages:
 # %message%:        join message as seen in-game
@@ -351,11 +313,11 @@ MinecraftPlayerAchievementMessage:
 # %playercount%:   current player count
 # %playermax%:     maximum player count
 # %date%:          current date
-# %totalplayers%:  total amount of players to ever join the main world
+# %totalplayers%:  total amount of players to ever join the server
 # %uptimemins%:    amount of minutes since DiscordSRV has started
 # %uptimehours%:   amount of hours since DiscordSRV has started
 # %motd%:          motto of the day of the server
-# %serverversion%: server version such as Spigot-1.9
+# %serverversion%: server version such as NeoForge 21.1.252 (MC: 1.21.1)
 # %freememory%:    free memory of the JVM in MB
 # %usedmemory%:    used memory of the JVM in MB
 # %totalmemory%:   total memory of the JVM in MB
@@ -365,7 +327,7 @@ MinecraftPlayerAchievementMessage:
 # %totalmemorygb%: total memory of the JVM in GB
 # %maxmemorygb%:   max memory of the JVM in GB
 # %tps%:           average TPS of the server
-# PlaceholderAPI placeholders are also supported
+# Built-in placeholders (see the README) are also supported
 #
 ChannelTopicUpdaterChatChannelTopicFormat: "%playercount%/%playermax% players online | %totalplayers% unique players ever joined | Server online for %uptimemins% minutes | Last update: %date%"
 ChannelTopicUpdaterConsoleChannelTopicFormat: "TPS: %tps% | Mem: %usedmemorygb%GB used/%freememorygb%GB free/%maxmemorygb%GB max | %serverversion%"
