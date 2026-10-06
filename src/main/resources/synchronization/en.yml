@@ -19,7 +19,7 @@ NicknameSynchronizationCycleTime: 3
 NicknameSynchronizationFormat: "%displayname%"
 
 # Minecraft group <-> Discord role synchronization
-# Requires LuckPerms
+# Requires LuckPerms or FTB Ranks (see PermissionsProvider in config.yml). With FTB Ranks, use rank ids as group names
 #
 # GroupRoleSynchronizationGroupsAndRolesToSync: these are roles/groups you'd like synchronized between Discord and Minecraft
 #                                               {"MC_GROUP_NAME": "DISCORD_ROLE_ID"} is the format to go by when adding more group/role pairs

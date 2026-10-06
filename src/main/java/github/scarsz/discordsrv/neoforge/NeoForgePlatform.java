@@ -376,7 +376,7 @@ public class NeoForgePlatform implements Platform {
     /**
      * Runs the supplier on the main thread and waits (up to 10 seconds) for the result
      */
-    private <T> T callOnMainThread(Supplier<T> supplier) {
+    <T> T callOnMainThread(Supplier<T> supplier) {
         if (isMainThread()) return supplier.get();
         try {
             return supplyOnMainThread(supplier).get(10, TimeUnit.SECONDS);
@@ -414,6 +414,26 @@ public class NeoForgePlatform implements Platform {
         });
         if (names == null) throw new IllegalArgumentException("Invalid selector " + selector);
         return names;
+    }
+
+    private volatile FtbRanksBridge ftbRanks;
+
+    /**
+     * @return the FTB Ranks bridge, or null if FTB Ranks isn't installed
+     */
+    FtbRanksBridge getFtbRanks() {
+        if (ftbRanks == null && isModLoaded("ftbranks")) {
+            synchronized (this) {
+                if (ftbRanks == null) ftbRanks = new FtbRanksBridge(this);
+            }
+        }
+        return ftbRanks;
+    }
+
+    @Override
+    public github.scarsz.discordsrv.hooks.permissions.GroupProvider createGroupProvider(String id) {
+        if ("ftbranks".equals(id)) return getFtbRanks();
+        return null;
     }
 
     @Override

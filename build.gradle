@@ -46,6 +46,11 @@ neoForge {
 
 repositories {
     mavenCentral()
+    maven {
+        // FTB Ranks (optional integration)
+        url = 'https://maven.ftb.dev/releases'
+        content { includeGroup 'dev.ftb.mods' }
+    }
 }
 
 configurations {
@@ -105,6 +110,8 @@ dependencies {
 
     // Optional integrations
     compileOnly("net.luckperms:api:${luckperms_api_version}")
+    compileOnly("dev.ftb.mods:ftb-ranks-neoforge:${ftb_ranks_version}") { transitive = false }
+    compileOnly("dev.ftb.mods:ftb-library-neoforge:${ftb_library_version}") { transitive = false }
 
     compileOnly("org.projectlombok:lombok:${lombok_version}")
     annotationProcessor("org.projectlombok:lombok:${lombok_version}")

@@ -29,6 +29,9 @@ import github.scarsz.discordsrv.api.ApiManager;
 import github.scarsz.discordsrv.api.events.*;
 import github.scarsz.discordsrv.config.DynamicConfig;
 import github.scarsz.discordsrv.config.Language;
+import github.scarsz.discordsrv.hooks.permissions.GroupHook;
+import github.scarsz.discordsrv.hooks.permissions.GroupProvider;
+import github.scarsz.discordsrv.hooks.permissions.LuckPermsGroupProvider;
 import github.scarsz.discordsrv.hooks.permissions.LuckPermsHook;
 import github.scarsz.discordsrv.listeners.*;
 import github.scarsz.discordsrv.modules.alerts.AlertListener;
@@ -823,15 +826,19 @@ public class DiscordSRV {
         banSynchronizer = new BanSynchronizer();
         banSynchronizer.start();
 
-        // LuckPerms (permissions, groups & contexts)
-        if (platformInstance.isModLoaded("luckperms")) {
+        // permissions & groups: LuckPerms (also provides contexts) and/or FTB Ranks
+        boolean luckPermsLoaded = platformInstance.isModLoaded("luckperms");
+        if (luckPermsLoaded) {
             try {
                 LuckPermsHook.enable();
                 DiscordSRV.info(LangUtil.InternalMessage.PLUGIN_HOOK_ENABLING.toString().replace("{plugin}", "LuckPerms"));
             } catch (Throwable t) {
+                luckPermsLoaded = false;
                 error("Failed to hook LuckPerms", t);
             }
         }
+        GroupHook.setProvider(selectGroupProvider(luckPermsLoaded));
+        DiscordSRV.debug(Debug.GROUP_SYNC, "Groups provider: " + GroupHook.getProviderName());
 
         // start channel topic updater
         if (channelTopicUpdater != null && channelTopicUpdater.getState() != Thread.State.NEW) channelTopicUpdater.interrupt();
@@ -875,6 +882,35 @@ public class DiscordSRV {
             isReady = true;
             api.callEvent(new DiscordReadyEvent());
         }
+    }
+
+    /**
+     * Picks the groups provider according to the PermissionsProvider config option:
+     * "auto" (LuckPerms if installed, otherwise FTB Ranks), "luckperms", "ftbranks" or "none"
+     */
+    private GroupProvider selectGroupProvider(boolean luckPermsLoaded) {
+        String choice = config.getStringElse("PermissionsProvider", "auto").trim().toLowerCase(Locale.ROOT).replace(" ", "").replace("-", "").replace("_", "");
+        boolean auto = choice.isEmpty() || choice.equals("auto");
+        if (choice.equals("none")) return null;
+
+        if ((auto || choice.equals("luckperms")) && luckPermsLoaded) {
+            return new LuckPermsGroupProvider();
+        }
+        if (auto || choice.equals("ftbranks")) {
+            try {
+                GroupProvider ftbRanks = platformInstance.createGroupProvider("ftbranks");
+                if (ftbRanks != null) {
+                    DiscordSRV.info(LangUtil.InternalMessage.PLUGIN_HOOK_ENABLING.toString().replace("{plugin}", "FTB Ranks"));
+                    return ftbRanks;
+                }
+            } catch (Throwable t) {
+                error("Failed to hook FTB Ranks", t);
+            }
+        }
+        if (!auto) {
+            DiscordSRV.warning("PermissionsProvider is set to \"" + config.getString("PermissionsProvider") + "\" but that mod isn't installed (or the value is unknown), group synchronization is unavailable");
+        }
+        return null;
     }
 
     /**
@@ -940,7 +976,8 @@ public class DiscordSRV {
                 // shut down voice module
                 if (voiceModule != null) voiceModule.shutdown();
 
-                // unhook LuckPerms
+                // unhook LuckPerms / FTB Ranks
+                GroupHook.setProvider(null);
                 LuckPermsHook.disable();
 
                 // stop ban synchronization
@@ -1183,7 +1220,7 @@ public class DiscordSRV {
         channel = preEvent.getChannel(); // update channel from event in case any listeners modified it
         message = preEvent.getMessageComponent(); // update message from event in case any listeners modified it
 
-        String userPrimaryGroup = LuckPermsHook.getPrimaryGroup(player.getUniqueId());
+        String userPrimaryGroup = GroupHook.getPrimaryGroup(player.getUniqueId());
         boolean hasGoodGroup = StringUtils.isNotBlank(userPrimaryGroup);
 
         // capitalize the first letter of the user's primary group to look neater
@@ -1605,7 +1642,7 @@ public class DiscordSRV {
      * @param checkPermissions whether to check if a permissions mod (LuckPerms) is available
      */
     public boolean isGroupRoleSynchronizationEnabled(boolean checkPermissions) {
-        if (checkPermissions && !LuckPermsHook.isEnabled()) return false;
+        if (checkPermissions && !GroupHook.isEnabled()) return false;
         final Map<String, String> groupsAndRolesToSync = config.getMap("GroupRoleSynchronizationGroupsAndRolesToSync");
         if (groupsAndRolesToSync.isEmpty()) return false;
         for (Map.Entry<String, String> entry : groupsAndRolesToSync.entrySet()) {

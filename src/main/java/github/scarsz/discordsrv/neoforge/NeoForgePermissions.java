@@ -33,12 +33,14 @@ import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Maps DiscordSRV's permission nodes onto NeoForge's PermissionAPI, so permission mods that implement a NeoForge
- * permission handler (LuckPerms, FTB Ranks, ...) can manage them. Without such a mod, the defaults from
+ * permission handler (eg. LuckPerms) can manage them. FTB Ranks is queried directly (it doesn't implement a
+ * permission handler): a node set in an FTB rank takes precedence. Without such a mod, the defaults from
  * {@link PermissionDefaults} apply: "op" permissions are granted to server operators.
  */
 public class NeoForgePermissions {
@@ -101,6 +103,12 @@ public class NeoForgePermissions {
 
     public boolean hasPermission(ServerPlayer player, String permission) {
         String node = normalize(permission);
+        // FTB Ranks doesn't hook NeoForge's permission API, ask it directly
+        FtbRanksBridge ftbRanks = platform.getFtbRanks();
+        if (ftbRanks != null) {
+            Optional<Boolean> value = ftbRanks.getPermission(player, node);
+            if (value.isPresent()) return value.get();
+        }
         PermissionNode<Boolean> permissionNode = nodes.get(node);
         if (permissionNode != null) {
             try {
@@ -119,6 +127,11 @@ public class NeoForgePermissions {
             if (online != null) return hasPermission(online, permission);
         }
         String node = normalize(permission);
+        FtbRanksBridge ftbRanks = platform.getFtbRanks();
+        if (ftbRanks != null) {
+            Optional<Boolean> value = ftbRanks.getOfflinePermission(uuid, node);
+            if (value.isPresent()) return value.get();
+        }
         PermissionNode<Boolean> permissionNode = nodes.get(node);
         if (permissionNode != null) {
             try {

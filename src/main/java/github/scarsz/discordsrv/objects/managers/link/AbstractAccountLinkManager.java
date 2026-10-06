@@ -26,7 +26,7 @@ import github.scarsz.discordsrv.api.events.AccountLinkedEvent;
 import github.scarsz.discordsrv.api.events.AccountUnlinkedEvent;
 import github.scarsz.discordsrv.objects.managers.AccountLinkManager;
 import github.scarsz.discordsrv.objects.managers.GroupSynchronizationManager;
-import github.scarsz.discordsrv.hooks.permissions.LuckPermsHook;
+import github.scarsz.discordsrv.hooks.permissions.GroupHook;
 import github.scarsz.discordsrv.platform.GamePlayer;
 import github.scarsz.discordsrv.util.DiscordUtil;
 import github.scarsz.discordsrv.util.PlaceholderUtil;
@@ -112,7 +112,7 @@ public abstract class AbstractAccountLinkManager implements AccountLinkManager {
         }
 
         // group sync using the authoritative side
-        if (DiscordSRV.config().getBoolean("GroupRoleSynchronizationOnLink") && LuckPermsHook.isEnabled()) {
+        if (DiscordSRV.config().getBoolean("GroupRoleSynchronizationOnLink") && GroupHook.isEnabled()) {
             DiscordSRV.getPlugin().getGroupSynchronizationManager().resync(
                     uuid,
                     GroupSynchronizationManager.SyncDirection.AUTHORITATIVE,

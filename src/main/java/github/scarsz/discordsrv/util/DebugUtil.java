@@ -26,7 +26,7 @@ import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.api.events.DebugReportedEvent;
 import github.scarsz.discordsrv.config.DynamicConfig;
 import github.scarsz.discordsrv.config.Language;
-import github.scarsz.discordsrv.hooks.permissions.LuckPermsHook;
+import github.scarsz.discordsrv.hooks.permissions.GroupHook;
 import github.scarsz.discordsrv.listeners.DiscordDisconnectListener;
 import github.scarsz.discordsrv.modules.voice.VoiceModule;
 import github.scarsz.discordsrv.objects.Lag;
@@ -98,7 +98,7 @@ public class DebugUtil {
                     "Environmental variables:",
                     "   discord main guild roles: " + (DiscordSRV.getPlugin().getMainGuild() == null ? "invalid main guild" : DiscordSRV.getPlugin().getMainGuild().getRoles().stream().map(Role::toString).collect(Collectors.toList())),
                     "   discord server owner: " + (DiscordSRV.getPlugin().getMainGuild() == null ? "invalid main guild" : DiscordSRV.getPlugin().getMainGuild().getOwner()),
-                    "   luckperms: " + (platform.isModLoaded("luckperms") ? "loaded" : "not loaded") + (LuckPermsHook.isEnabled() ? ", hooked" : ", not hooked"),
+                    "   luckperms: " + (platform.isModLoaded("luckperms") ? "loaded" : "not loaded") + (GroupHook.isEnabled() ? ", hooked" : ", not hooked"),
                     "Threads:",
                     "   channel topic updater -> alive: " + (DiscordSRV.getPlugin().getChannelTopicUpdater() != null && DiscordSRV.getPlugin().getChannelTopicUpdater().isAlive()),
                     "   channel updater -> alive: " + (DiscordSRV.getPlugin().getChannelUpdater() != null && DiscordSRV.getPlugin().getChannelUpdater().isAlive()),

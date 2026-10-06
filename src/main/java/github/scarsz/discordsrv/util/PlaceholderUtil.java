@@ -21,7 +21,7 @@
 package github.scarsz.discordsrv.util;
 
 import github.scarsz.discordsrv.DiscordSRV;
-import github.scarsz.discordsrv.hooks.permissions.LuckPermsHook;
+import github.scarsz.discordsrv.hooks.permissions.GroupHook;
 import github.scarsz.discordsrv.objects.Lag;
 import github.scarsz.discordsrv.platform.GamePlayer;
 import github.scarsz.discordsrv.platform.Platform;
@@ -63,7 +63,7 @@ public class PlaceholderUtil {
                         .replace("%player_ping%", String.valueOf(player.getPing()));
             }
             if (input.contains("%luckperms_primary_group_name%")) {
-                input = input.replace("%luckperms_primary_group_name%", notNull(LuckPermsHook.getPrimaryGroup(player.getUniqueId())));
+                input = input.replace("%luckperms_primary_group_name%", notNull(GroupHook.getPrimaryGroup(player.getUniqueId())));
             }
         }
         if (input.contains("%server_")) {

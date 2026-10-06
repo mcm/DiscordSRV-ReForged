@@ -22,7 +22,7 @@ package github.scarsz.discordsrv.objects.managers;
 
 import github.scarsz.discordsrv.Debug;
 import github.scarsz.discordsrv.DiscordSRV;
-import github.scarsz.discordsrv.hooks.permissions.LuckPermsHook;
+import github.scarsz.discordsrv.hooks.permissions.GroupHook;
 import github.scarsz.discordsrv.objects.ExpiringDualHashBidiMap;
 import github.scarsz.discordsrv.platform.GamePlayer;
 import github.scarsz.discordsrv.platform.event.GameListener;
@@ -101,7 +101,7 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
     }
 
     public void resync(SyncDirection direction, SyncCause cause) {
-        if (!LuckPermsHook.isEnabled()) return;
+        if (!GroupHook.isEnabled()) return;
 
         Set<UUID> players = PlayerUtil.getOnlinePlayers().stream()
                 .map(GamePlayer::getUniqueId)
@@ -145,8 +145,8 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
     public void resync(UUID player, SyncDirection direction, boolean addLinkedRole, SyncCause cause) {
         if (player == null) return;
         String playerName = getPlayerName(player);
-        if (!LuckPermsHook.isEnabled()) {
-            DiscordSRV.debug(Debug.GROUP_SYNC, "Can't synchronize groups/roles for " + playerName + ", permissions provider (LuckPerms) is not available");
+        if (!GroupHook.isEnabled()) {
+            DiscordSRV.debug(Debug.GROUP_SYNC, "Can't synchronize groups/roles for " + playerName + ", no permissions provider (LuckPerms/FTB Ranks) is available");
             return;
         }
 
@@ -237,9 +237,9 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
 
             String[] playerGroups;
             try {
-                playerGroups = LuckPermsHook.getPlayerGroups(player);
+                playerGroups = GroupHook.getPlayerGroups(player);
                 if (playerGroups == null) {
-                    synchronizationSummary.add("Tried to sync {" + role + ":" + groupName + "} but LuckPerms returned null as the player's groups (Player is " + (isOnline(player) ? "online" : "offline") + ")");
+                    synchronizationSummary.add("Tried to sync {" + role + ":" + groupName + "} but " + GroupHook.getProviderName() + " returned null as the player's groups (Player is " + (isOnline(player) ? "online" : "offline") + ")");
                     continue;
                 }
             } catch (Throwable t) {
@@ -250,8 +250,8 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
             boolean primaryGroupOnly = DiscordSRV.config().getBoolean("GroupRoleSynchronizationPrimaryGroupOnly");
             if (!permissionGroupsLogged) {
                 synchronizationSummary.add("Player " + playerName + "'s " +
-                        (primaryGroupOnly ? "Primary group: " + LuckPermsHook.getPrimaryGroupLoading(player) + ", " : "")
-                        + "LuckPerms groups: " + Arrays.toString(playerGroups) +
+                        (primaryGroupOnly ? "Primary group: " + GroupHook.getPrimaryGroupLoading(player) + ", " : "")
+                        + GroupHook.getProviderName() + " groups: " + Arrays.toString(playerGroups) +
                         " (Player is " + (isOnline(player) ? "online" : "offline") + ")");
                 permissionGroupsLogged = true;
             }
@@ -259,8 +259,8 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
             boolean hasGroup;
             try {
                 hasGroup = primaryGroupOnly
-                        ? groupName.equalsIgnoreCase(LuckPermsHook.getPrimaryGroupLoading(player))
-                        : LuckPermsHook.playerInGroup(player, groupName);
+                        ? groupName.equalsIgnoreCase(GroupHook.getPrimaryGroupLoading(player))
+                        : GroupHook.playerInGroup(player, groupName);
 
                 if (DiscordSRV.getPlatform().hasPermission(player, "discordsrv.sync." + groupName)) {
                     hasGroup = true;
@@ -302,9 +302,9 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
                     List<String> additions = justModifiedGroups.computeIfAbsent(player, key -> new HashMap<>()).computeIfAbsent("add", key -> new ArrayList<>());
                     Runnable runnable = () -> {
                         try {
-                            String[] serverGroups = LuckPermsHook.getGroups();
+                            String[] serverGroups = GroupHook.getGroups();
                             if (ArrayUtils.contains(serverGroups, groupName)) {
-                                if (!LuckPermsHook.playerAddGroup(player, groupName)) {
+                                if (!GroupHook.playerAddGroup(player, groupName)) {
                                     DiscordSRV.debug(Debug.GROUP_SYNC, "Synchronization #" + id + " for {" + playerName + ":" + user + "} failed: adding group " + groupName + ", returned a failure");
                                     additions.remove(groupName);
                                 }
@@ -315,7 +315,7 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
                             permissionsError("Could not add a player to a group", t);
                         }
                     };
-                    // LuckPerms is thread safe, so this is run directly (resync is never run on the server thread)
+                    // the group provider handles threading itself (resync is never run on the server thread)
                     additions.add(groupName);
                     runnable.run();
                     synchronizationSummary.add("{" + groupName + ":" + role + "} adds Minecraft group" + (roleIsManaged ? " (Managed Role)" : ""));
@@ -330,8 +330,8 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
                     List<String> removals = justModifiedGroups.computeIfAbsent(player, key -> new HashMap<>()).computeIfAbsent("remove", key -> new ArrayList<>());
                     Runnable runnable = () -> {
                         try {
-                            if (LuckPermsHook.playerInGroup(player, groupName)) {
-                                if (!LuckPermsHook.playerRemoveGroup(player, groupName)) {
+                            if (GroupHook.playerInGroup(player, groupName)) {
+                                if (!GroupHook.playerRemoveGroup(player, groupName)) {
                                     DiscordSRV.debug(Debug.GROUP_SYNC, "Synchronization #" + id + " for {" + playerName + ":" + user + "} failed: removing group " + groupName + " returned a failure");
                                     removals.add(groupName);
                                 }
@@ -343,7 +343,7 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
                             permissionsError("Could not remove a player from a group", t);
                         }
                     };
-                    // LuckPerms is thread safe, so this is run directly (resync is never run on the server thread)
+                    // the group provider handles threading itself (resync is never run on the server thread)
                     removals.add(groupName);
                     runnable.run();
                     synchronizationSummary.add("{" + groupName + ":" + role + "} removes Minecraft group" + (roleIsManaged ? " (Managed Role)" : ""));
@@ -457,7 +457,7 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
     }
 
     private void permissionsError(String problem, Throwable throwable) {
-        DiscordSRV.error(problem + ". Caused by a error in the permissions provider: LuckPerms", throwable);
+        DiscordSRV.error(problem + ". Caused by a error in the permissions provider: " + GroupHook.getProviderName(), throwable);
     }
 
     private static String getPlayerName(UUID uuid) {
@@ -505,8 +505,8 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
             List<String> fail = new ArrayList<>();
             List<String> success = new ArrayList<>();
             for (String group : DiscordSRV.getPlugin().getGroupSynchronizables().keySet()) {
-                if (LuckPermsHook.playerInGroup(player, group)) {
-                    if (LuckPermsHook.playerRemoveGroup(player, group)) {
+                if (GroupHook.playerInGroup(player, group)) {
+                    if (GroupHook.playerRemoveGroup(player, group)) {
                         success.add(group);
                     } else {
                         fail.add(group);
@@ -603,7 +603,9 @@ public class GroupSynchronizationManager extends ListenerAdapter implements Game
             Pattern.compile("/?permissions player " + userRegex + " (?:(?:setgroup)|(?:addgroup)|(?:removegroup)).*", Pattern.CASE_INSENSITIVE),
             Pattern.compile("/?(?:un)?setrank " + userRegex + ".*", Pattern.CASE_INSENSITIVE),
             // PermissionsEx + zPermissions
-            Pattern.compile("/?(?:pex )?(?:promote|demote) " + userRegex + ".*", Pattern.CASE_INSENSITIVE)
+            Pattern.compile("/?(?:pex )?(?:promote|demote) " + userRegex + ".*", Pattern.CASE_INSENSITIVE),
+            // FTB Ranks
+            Pattern.compile("/?ftbranks (?:add|remove) " + userRegex + " .*", Pattern.CASE_INSENSITIVE)
     );
 
     @Override

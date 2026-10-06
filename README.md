@@ -15,7 +15,7 @@ Most of DiscordSRV's features work the same as on Spigot and use the same config
 - Console channel: the server log streamed to a Discord channel, and commands sent there run as the console
 - `!c <command>` console commands and the `playerlist` command from the chat channel, canned responses
 - Account linking (`/discord link`, linking codes sent to the bot in a DM or the link channel), stored in a file or MySQL
-- Group ↔ role synchronization via **LuckPerms** (also LuckPerms contexts such as `discordsrv:linked`)
+- Group ↔ role synchronization via **FTB Ranks** or **LuckPerms** (plus LuckPerms contexts such as `discordsrv:linked`)
 - Nickname synchronization, ban synchronization (both directions)
 - "Require linked account to play" (also with required Discord server membership / subscriber roles)
 - Bot presence/status cycling, server watchdog messages
@@ -35,14 +35,21 @@ Most of DiscordSRV's features work the same as on Spigot and use the same config
    or a `config/discordsrv/.token` file.
 5. Set the channel ids (`Channels`, `DiscordConsoleChannelId`) and restart the server.
 
-Optional: install [LuckPerms](https://luckperms.net) for permissions, primary groups in chat formats and group sync.
+Optional: install [FTB Ranks](https://www.curseforge.com/minecraft/mc-mods/ftb-ranks-forge) or
+[LuckPerms](https://luckperms.net) for permissions, primary groups in chat formats and group ↔ role sync.
+`PermissionsProvider` in `config.yml` selects which one provides the groups (`auto` = LuckPerms if installed, otherwise
+FTB Ranks). With FTB Ranks, ranks are the groups: use rank ids in `GroupRoleSynchronizationGroupsAndRolesToSync`;
+the primary group is the player's highest-power rank. While a player is online all their active ranks count
+(including conditional ones such as playtime ranks); for offline players only the ranks they were added to count.
 
 ## Commands & permissions
 
 `/discord` (alias `/discordsrv`): `help`, `link`, `unlink`, `linked`, `broadcast`, `reload`, `resync`, `language`,
 `debug`, `debugger`.
 
-Permissions are registered with NeoForge's permission API (so LuckPerms and other permission mods can manage them).
+Permissions are registered with NeoForge's permission API (so permission handlers such as LuckPerms can manage
+them). FTB Ranks doesn't implement NeoForge's permission API, so DiscordSRV asks FTB Ranks directly: a `discordsrv.*`
+node set in an FTB rank (eg. `discordsrv.chat: false`) takes precedence over the defaults.
 Without a permission mod, the defaults of the Spigot version apply: player permissions (`discordsrv.chat`,
 `discordsrv.link`, `discordsrv.linked`, `discordsrv.discord`, `discordsrv.help`, `discordsrv.nicknamesync`) are granted
 to everyone, admin permissions (`discordsrv.reload`, `discordsrv.bcast`, `discordsrv.unlink`, `discordsrv.*.others`,
@@ -52,11 +59,11 @@ and the group sync permissions `discordsrv.sync.<group>` / `discordsrv.sync.deny
 ## Differences from the Spigot version
 
 - **Plugin hooks** don't exist on NeoForge: chat channel plugins (only the `global` channel is bridged in game),
-  vanish plugins, Vault (replaced by LuckPerms), PlaceholderAPI, Multiverse (`%worldalias%` equals `%world%`, which is
+  vanish plugins, Vault (replaced by FTB Ranks / LuckPerms), PlaceholderAPI, Multiverse (`%worldalias%` equals `%world%`, which is
   the dimension name like `overworld`), Dynmap, mcMMO, Skript and Essentials.
 - **Placeholders**: instead of PlaceholderAPI, a few built-in placeholders can be used wherever the Spigot version
   accepted PlaceholderAPI placeholders: `%player_name%`, `%player_displayname%`, `%player_uuid%`, `%player_world%`,
-  `%player_ping%`, `%luckperms_primary_group_name%`, `%server_online%`, `%server_max_players%`, `%server_tps%`,
+  `%player_ping%`, `%luckperms_primary_group_name%` (the primary group from either provider), `%server_online%`, `%server_max_players%`, `%server_tps%`,
   `%server_version%`, `%server_motd%`, `%server_unique_joins%`.
 - **Require linked account to play** runs right after the vanilla ban/whitelist checks; the `Listener priority` and
   `Listener event` options are no longer used.

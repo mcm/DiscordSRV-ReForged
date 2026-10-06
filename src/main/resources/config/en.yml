@@ -71,6 +71,16 @@ Timezone: default
 # MinecraftMentionSound: Whether a sound should be sent to the player in Minecraft when they are mentioned from Discord
 MinecraftMentionSound: true
 
+# Permissions & groups provider
+# Which mod provides the groups/ranks used for group <-> role synchronization (synchronization.yml) and %primarygroup%:
+#   auto:      LuckPerms if it's installed, otherwise FTB Ranks
+#   luckperms: LuckPerms (groups)
+#   ftbranks:  FTB Ranks (ranks, use the rank ids as group names)
+#   none:      no group synchronization
+# DiscordSRV's permission nodes (discordsrv.*) can be set in FTB Ranks ranks or with LuckPerms either way.
+# You must restart your server after changing this option
+PermissionsProvider: auto
+
 # Presence information
 # You must restart your server after changing this option
 #

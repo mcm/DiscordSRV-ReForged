@@ -34,3 +34,10 @@ config="discordsrv.mixins.json"
     versionRange="*"
     ordering="AFTER"
     side="SERVER"
+
+[[dependencies.${mod_id}]]
+    modId="ftbranks"
+    type="optional"
+    versionRange="*"
+    ordering="AFTER"
+    side="SERVER"

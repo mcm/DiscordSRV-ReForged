@@ -24,7 +24,7 @@ import com.vdurmont.emoji.EmojiParser;
 import github.scarsz.discordsrv.Debug;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.api.events.*;
-import github.scarsz.discordsrv.hooks.permissions.LuckPermsHook;
+import github.scarsz.discordsrv.hooks.permissions.GroupHook;
 import github.scarsz.discordsrv.platform.GamePlayer;
 import github.scarsz.discordsrv.util.*;
 import net.dv8tion.jda.api.entities.Message;
@@ -441,7 +441,7 @@ public class DiscordChatListener extends ListenerAdapter {
 
             List<String> playerList = new LinkedList<>();
             for (GamePlayer player : PlayerUtil.getOnlinePlayers(true)) {
-                String userPrimaryGroup = LuckPermsHook.getPrimaryGroup(player.getUniqueId());
+                String userPrimaryGroup = GroupHook.getPrimaryGroup(player.getUniqueId());
                 boolean hasGoodGroup = StringUtils.isNotBlank(userPrimaryGroup);
                 // capitalize the first letter of the user's primary group to look neater
                 if (hasGoodGroup) userPrimaryGroup = userPrimaryGroup.substring(0, 1).toUpperCase() + userPrimaryGroup.substring(1);

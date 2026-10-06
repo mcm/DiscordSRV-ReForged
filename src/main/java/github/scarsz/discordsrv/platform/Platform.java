@@ -160,6 +160,15 @@ public interface Platform {
     java.util.List<String> selectEntityNames(CommandSender sender, String selector) throws Exception;
 
     /**
+     * Creates a groups provider backed by a platform specific mod
+     * @param id the provider id, eg. {@code ftbranks}
+     * @return the provider, or null if it isn't available (eg. the mod isn't installed)
+     */
+    default github.scarsz.discordsrv.hooks.permissions.GroupProvider createGroupProvider(String id) {
+        return null;
+    }
+
+    /**
      * @return whether a mod with the given id is loaded
      */
     boolean isModLoaded(String modId);
