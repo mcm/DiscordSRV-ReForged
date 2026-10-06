@@ -22,3 +22,9 @@ jobs:
         with:
           name: DiscordSRV-ReForged
           path: build/libs/*.jar
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/reports/tests/
