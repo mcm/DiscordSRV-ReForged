@@ -55,6 +55,7 @@ public class DiscordBanListener extends ListenerAdapter {
         String reason = LangUtil.Message.BAN_DISCORD_TO_MINECRAFT.toString();
         if (platform.isBanned(linkedUuid)) return; // if they are already banned we don't want to overwrite the original ban reason
         // also kicks them if they're online, because adding them to the ban list isn't enough
+        BanSynchronizer.ignoreNextChange(linkedUuid); // don't sync this ban back to Discord
         platform.ban(linkedUuid, playerName, reason, "Discord");
     }
 
@@ -75,8 +76,10 @@ public class DiscordBanListener extends ListenerAdapter {
             return;
         }
 
-        if (StringUtils.isNotBlank(playerName))
+        if (StringUtils.isNotBlank(playerName) && DiscordSRV.getPlatform().isBanned(linkedUuid)) {
+            BanSynchronizer.ignoreNextChange(linkedUuid); // don't sync this unban back to Discord
             DiscordSRV.getPlatform().unban(linkedUuid);
+        }
     }
 
 }

@@ -940,6 +940,9 @@ public class DiscordSRV {
                 // shut down voice module
                 if (voiceModule != null) voiceModule.shutdown();
 
+                // unhook LuckPerms
+                LuckPermsHook.disable();
+
                 // stop ban synchronization
                 if (banSynchronizer != null) banSynchronizer.shutdown();
 

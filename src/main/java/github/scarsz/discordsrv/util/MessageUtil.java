@@ -30,7 +30,6 @@ import dev.vankka.simpleast.core.simple.SimpleMarkdownRules;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.platform.CommandSender;
 import github.scarsz.discordsrv.objects.DiscordSRVMinecraftRenderer;
-import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -113,10 +112,9 @@ public class MessageUtil {
 
         MinecraftSerializerOptions<Component> options = MinecraftSerializerOptions
                 .defaults().addRenderer(new DiscordSRVMinecraftRenderer());
-        MinecraftSerializerOptions<String> escapeOptions = MinecraftSerializerOptions.escapeDefaults();
 
-        MINECRAFT_SERIALIZER = new MinecraftSerializer(options, escapeOptions);
-        LIMITED_MINECRAFT_SERIALIZER = new MinecraftSerializer(options.withRules(rules), escapeOptions);
+        MINECRAFT_SERIALIZER = new MinecraftSerializer(options);
+        LIMITED_MINECRAFT_SERIALIZER = new MinecraftSerializer(options.withRules(rules));
     }
 
     private MessageUtil() {}
